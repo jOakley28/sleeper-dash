@@ -123,6 +123,9 @@ details.nerds[hidden]{display:none}
 .tcap{position:fixed;left:50%;bottom:calc(64px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:max-content;max-width:88vw;padding:calc(12px*var(--s)) calc(20px*var(--s));border-radius:calc(22px*var(--s));background:rgba(28,28,30,.9);color:#fff;font-size:calc(15px*var(--s));font-weight:600;text-align:center;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);box-shadow:0 10px 40px rgba(0,0,0,.35)}
 .tcap.top{bottom:auto;top:calc(72px + env(safe-area-inset-top,0px))}
 .tdots{display:flex;justify-content:center;gap:calc(6px*var(--s));margin-top:calc(8px*var(--s))}.tdots b{width:calc(6px*var(--s));height:calc(6px*var(--s));border-radius:50%;background:rgba(255,255,255,.3);transition:background .3s}.tdots b.on{background:#fff}
+.mine{margin-bottom:calc(18px*var(--s))}.minet{font-size:calc(13px*var(--s));font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:.05em;margin:0 calc(4px*var(--s)) calc(10px*var(--s))}
+.hit2{flex:1;min-width:0;background:var(--fill);border-radius:calc(18px*var(--s));padding:calc(12px*var(--s)) calc(14px*var(--s))}.row .hit2:last-child{text-align:right}
+.conf{display:flex;align-items:baseline;justify-content:center;gap:calc(8px*var(--s));margin-top:calc(14px*var(--s))}.conf b{font-size:calc(46px*var(--s));font-weight:700;letter-spacing:-.04em;line-height:1}.conf span{font-size:calc(15px*var(--s));color:var(--mute)}
 .wp.sl{margin-top:calc(8px*var(--s))}.wp.sl b{font-style:italic;font-weight:600;font-size:calc(13px*var(--s));min-width:calc(40px*var(--s))}.wp.sl .track{height:calc(4px*var(--s))}
 .slcap{text-align:center;font-size:calc(11px*var(--s));font-style:italic;color:var(--mute);margin-top:calc(2px*var(--s))}
 #lsel,#myt{width:100%;box-shadow:none;background:var(--fill)}.addrow{display:flex;gap:calc(8px*var(--s));margin-top:calc(8px*var(--s))}.addrow input{flex:1;min-width:0;padding:calc(9px*var(--s)) calc(14px*var(--s));border:0;border-radius:calc(980px*var(--s));background:var(--fill);color:var(--ink);font:inherit;font-size:calc(15px*var(--s))}
@@ -154,6 +157,7 @@ details.nerds[hidden]{display:none}
   <label class="wkpick"><span>Week</span><select id="wk"></select></label>
 </section>
 
+<div id="mine"></div>
 <h2 id="mh">Matchups</h2>
 <div id="matchups"><p class="mute">Loading league…</p></div>
 <div class="leg" style="margin:calc(4px*var(--s)) calc(4px*var(--s)) 0"><span style="--c:var(--accent)">Not started</span><span style="--c:var(--yel)">In progress</span><span style="--c:var(--gray)">Played</span><span style="--c:var(--a2)">Out, in lineup</span></div>
@@ -391,7 +395,7 @@ function initProj(id,act){
   let e=S.exp[id];
   if(!e){const p=posOf(id),c=p&&S.curves&&S.curves[p];e=c&&c.length?{m:c[Math.min(c.length-1,35)].mean}:{m:5};}
   let m2=e.m;
-  if(pj!=null){const c=S.cal,pos=posOf(id),adj=(c?((c.bp&&c.bp[pos])||c.beta):1)*pj,A0=c&&c.a!=null?c.a:W_PROJ,w=nn<3?1:A0+(1-A0)*(1-Math.min(1,(nn-3)/(W_FULL_GAMES-3)));m2=w*adj+(1-w)*e.m;}
+  if(pj!=null){const c=S.cal,pos=posOf(id),adj=(c?((c.bp&&c.bp[pos])||c.beta):1)*pj,A0=c&&c.a!=null?c.a:W_PROJ,w=nn<3?1:A0+(1-A0)*(1-Math.min(1,(nn-3)/(W_FULL_GAMES-3)));m2=w*adj+(1-w)*e.m;if(c&&c.kind==="C"&&c.d){const rr=oddsRatio(team);if(rr!=null)m2*=1+c.d*(rr-1);}}
   const p=mid?1:pl&&pl.inj==="IR"?IR_P:pl&&DOUBT.includes(pl.inj)?DOUBT_MULT:1;
   return{sl:pj,pre:p*m2,gs,f:mid?0:gl/60};
 }
@@ -511,10 +515,35 @@ function minsLeft(ev){
   const [m,s]=(st.displayClock||"0:00").split(":").map(Number),c=(m||0)+(s||0)/60;
   return p<=4?(4-p)*15+c:c;
 }
-async function espnEvents(){
-  const w=S.view,y=S.season;
+function parseOdds(e,ta,th){
+  const o=e.competitions&&e.competitions[0]&&e.competitions[0].odds&&e.competitions[0].odds[0];if(!o)return null;
+  const ou=+o.overUnder;if(!(ou>20&&ou<80))return null;
+  const d=String(o.details||"");let fav=null,pts=0;
+  if(!/EVEN|PK/i.test(d)){
+    const m=d.match(/([A-Z]{2,4})\s+([+-]?\d+(?:\.\d+)?)/);if(!m)return null;
+    pts=Math.abs(+m[2]);const t=ABBR[m[1]]||m[1];fav=(+m[2]<0)?t:(t===ta?th:ta);
+  }
+  const hi=(ou+pts)/2,lo=(ou-pts)/2;
+  return fav===ta?[hi,lo]:fav===th?[lo,hi]:[ou/2,ou/2];
+}
+function impMap(ev){
+  const out={};
+  (ev||[]).forEach(e=>{
+    const c=e.competitions&&e.competitions[0]&&e.competitions[0].competitors;if(!c)return;
+    const h=c.find(x=>x.homeAway==="home"),a=c.find(x=>x.homeAway==="away");if(!h||!a)return;
+    const ta=ABBR[a.team.abbreviation]||a.team.abbreviation,th=ABBR[h.team.abbreviation]||h.team.abbreviation,od=parseOdds(e,ta,th);
+    if(od){out[ta]=od[0];out[th]=od[1];}
+  });
+  return out;
+}
+function oddsRatio(team){
+  const o=S.odds&&S.odds[team];if(!o)return null;
+  const v=Object.values(S.odds);if(v.length<8)return null;
+  return o/(v.reduce((q,x)=>q+x,0)/v.length);
+}
+async function espnEvents(w=S.view,y=S.season,quiet=false){
   const bases=[ESPN,"https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard"];
-  const qs=[`?dates=${y}&seasontype=2&week=${w}`,`?seasontype=2&week=${w}`,...(w===S.week?[""]:[])];
+  const qs=[`?dates=${y}&seasontype=2&week=${w}`,`?seasontype=2&week=${w}`,...(w===S.week&&String(y)===String(S.season)?[""]:[])];
   let err="no response",empty=null;
   for(const b of bases)for(const q of qs){
     try{
@@ -526,13 +555,13 @@ async function espnEvents(){
     }catch(e){err=e.message+(e instanceof TypeError?" (likely CORS or network block)":"");}
   }
   if(empty)return empty;
-  setDiag("ESPN scoreboard",false,err);return null;
+  if(!quiet)setDiag("ESPN scoreboard",false,err);return null;
 }
 async function loadGames(){
   const ev=await espnEvents();
   if(!ev){if(!S.games)$("games").innerHTML='<p class="mute">Couldn’t reach ESPN for NFL game data. It will retry every 30 seconds.</p>';return;}
   setDiag("ESPN scoreboard",true,ev.length+" games");
-  S.games={};S.gst={};S.gi={};
+  S.games={};S.gst={};S.gi={};S.odds=impMap(ev);
   $("games").innerHTML=ev.map(e=>{
     const c=e.competitions[0].competitors,h=c.find(x=>x.homeAway==="home"),a=c.find(x=>x.homeAway==="away");
     const ab=x=>ABBR[x.team.abbreviation]||x.team.abbreviation,left=minsLeft(e),t=e.status.type;
@@ -592,13 +621,15 @@ function rankAt(g,sg,cache){
   return cache[g]=m;
 }
 function pm(o,par){
-  const pp=(par.kind==="B"?(par.bp[o.pos]||par.bg):par.bg)*o.p;
-  return par.kind==="B"&&o.rc!=null?par.a*pp+(1-par.a)*(par.r*o.rc+(1-par.r)*o.own):pp;
+  const pp=(par.kind!=="A"?(par.bp[o.pos]||par.bg):par.bg)*o.p;
+  let m=par.kind!=="A"&&o.rc!=null?par.a*pp+(1-par.a)*(par.r*o.rc+(1-par.r)*o.own):pp;
+  if(par.d&&o.r!=null)m*=1+par.d*(o.r-1); // game environment from the betting lines
+  return m;
 }
 function fitModel(kind,obs){
   let spa=0,spp=0;obs.forEach(o=>{spa+=o.p*o.a;spp+=o.p*o.p;});
   const bg=clamp(spp?spa/spp:1,.7,1.1),par={kind,bg,bp:{},a:1,r:.5};
-  if(kind==="B"){
+  if(kind!=="A"){
     POS.forEach(pos=>{let x=0,y=0;obs.forEach(o=>{if(o.pos===pos){x+=o.p*o.a;y+=o.p*o.p;}});par.bp[pos]=clamp((x+3000*bg)/(y+3000),.6,1.2);});
     let best=null;
     for(const r of [0,.25,.5,.75,1]){
@@ -610,6 +641,7 @@ function fitModel(kind,obs){
     }
     par.r=best.r;par.a=best.a;
   }
+  if(kind==="C"){par.d=0;let num=0,den=0;obs.forEach(o=>{if(o.r==null)return;const m=pm(o,par);num+=(o.a-m)*m*(o.r-1);den+=(m*(o.r-1))**2;});par.d=den?clamp(num/den,-.3,1):0;}
   const bins=[0,3,7,11,15,20,99],pts=[];
   for(let k=0;k<bins.length-1;k++){
     const x=obs.filter(o=>{const m=pm(o,par);return m>=bins[k]&&m<bins[k+1];});if(x.length<15)continue;
@@ -640,19 +672,20 @@ async function backtest(){
   const data=[];
   for(let i=0;i<jobs.length;i+=6){
     const part=await Promise.all(jobs.slice(i,i+6).map(async([id,se,w])=>{
-      const [mu,pr]=await Promise.all([get(`Past matchups ${se} wk${w}`,`${SL}/league/${id}/matchups/${w}`),projFor(se,w)]);
+      const [mu,pr,ev]=await Promise.all([get(`Past matchups ${se} wk${w}`,`${SL}/league/${id}/matchups/${w}`),projFor(se,w),espnEvents(w,se,true)]);
       const g=S.jidx&&S.jidx[se+":"+w];
-      return mu.ok&&pr&&g!=null&&mu.j.some(m=>m.points>0)?{mu:mu.j,pr,g,se}:null;}));
+      return mu.ok&&pr&&g!=null&&mu.j.some(m=>m.points>0)?{mu:mu.j,pr,g,se,imp:impMap(ev)}:null;}));
     data.push(...part.filter(Boolean));
   }
   const O=[],Gs=[],rk={};
-  for(const {mu,pr,g,se} of data){
+  for(const {mu,pr,g,se,imp} of data){
     const rkm=rankAt(g,se,rk),by={};mu.forEach(m=>(by[m.matchup_id]??=[]).push(m));
     const team=m=>{const os=[];(m.starters||[]).forEach((id,i)=>{
       const p=pr[id],a=(m.starters_points||[])[i];if(!id||id==="0"||p==null||a==null)return;
       const pos=(S.pl[id]&&S.pl[id].pos)||(S.players[id]&&S.players[id].pos)||(isNaN(id)?"DEF":null);
       const h=POS.includes(pos)?histFor(id,g,se):null,c=S.curves&&S.curves[pos],rkn=rkm[id];
-      const o={p,a,pos,g,rc:null,own:null};
+      const o={p,a,pos,g,rc:null,own:null,r:null};
+      {const tm=S.players[id]&&S.players[id].team,vals=Object.values(imp||{});if(tm&&imp&&imp[tm]!=null&&vals.length>=8)o.r=imp[tm]/(vals.reduce((q,x)=>q+x,0)/vals.length);}
       if(h&&c&&c.length&&rkn){o.rc=c[Math.min(rkn-1,c.length-1)].mean;o.own=h.own;}
       os.push(o);O.push(o);});return{os,pts:m.points||0};};
     for(const gm of Object.values(by))if(gm.length===2){const A=team(gm[0]),B=team(gm[1]);if(A.os.length>=6&&B.os.length>=6&&A.pts!==B.pts)Gs.push({g,A:A.os,B:B.os,y:A.pts>B.pts?1:0});}
@@ -669,9 +702,11 @@ async function backtest(){
     }
     return n?{ll:ll/n,br:br/n,acc:ok/n}:{ll:9,br:.25,acc:.5};
   };
-  const eA=evalKind("A"),eB=evalKind("B"),kind=eB.ll<eA.ll?"B":"A",ev=kind==="B"?eB:eA;
+  const eA=evalKind("A"),eB=evalKind("B"),cov=O.length?O.filter(o=>o.r!=null).length/O.length:0,eC=cov>=.5?evalKind("C"):null;
+  let kind=eB.ll<eA.ll?"B":"A";if(eC&&eC.ll<(kind==="B"?eB:eA).ll-.002)kind="C";
+  const ev=kind==="C"?eC:kind==="B"?eB:eA;
   const par=fitModel(kind,O),S0=bestSpread(par,Gs);
-  S.cal={week:S.week,season:S.season,kind,beta:par.bg,bp:par.bp,a:kind==="B"?par.a:1,r:par.r,sa:par.sa,sb:par.sb,S0,n:Gs.length,brier:ev.br,acc:ev.acc,brierA:eA.br,brierB:eB.br};
+  S.cal={week:S.week,season:S.season,kind,beta:par.bg,bp:par.bp,a:kind!=="A"?par.a:1,d:kind==="C"?par.d:0,cov,brierC:eC?eC.br:null,r:par.r,sa:par.sa,sb:par.sb,S0,n:Gs.length,brier:ev.br,acc:ev.acc,brierA:eA.br,brierB:eB.br};
   try{localStorage.setItem(key,JSON.stringify(S.cal));}catch(e){}
   showCal();
 }
@@ -684,6 +719,32 @@ function gammaR(k,r){
   if(k<1)return gammaR(k+1,r)*Math.pow(r()||1e-12,1/k);
   const d=k-1/3,c=1/Math.sqrt(9*d);
   for(;;){let x,v;do{x=normR(r);v=1+c*x;}while(v<=0);v=v*v*v;const u=r();if(u<1-.0331*x*x*x*x||Math.log(u||1e-12)<.5*x*x+d*(1-v+Math.log(v)))return d*v;}
+}
+function simDetail(A,B,ap,bp,seed,pa,pb){
+  const rng=mulberry(seed),N=4000,xa=new Float32Array(N),xb=new Float32Array(N);
+  const draw=(T,parts)=>{let x=0;for(const q of parts)x+=gammaR(q.mu*q.mu/q.v,rng)*(q.v/q.mu);return x+(T.extra>0?normR(rng)*Math.sqrt(T.extra):0);};
+  for(let i=0;i<N;i++){xa[i]=ap+draw(A,pa);xb[i]=bp+draw(B,pb);}
+  const q=(arr,p)=>Float32Array.from(arr).sort()[Math.min(N-1,Math.floor(p*N))],mean=arr=>arr.reduce((t,v)=>t+v,0)/N;
+  return{a:[q(xa,.1),mean(xa),q(xa,.9)],b:[q(xb,.1),mean(xb),q(xb,.9)]};
+}
+function drawMine(){
+  const el=$("mine");if(!el)return;
+  const h=S.heroData;
+  if(!S.my||!h){el.innerHTML="";return;}
+  const meA=String(h.a.roster_id)===S.my,Me=meA?h.A:h.B,Op=meA?h.B:h.A,me=meA?h.a:h.b,op=meA?h.b:h.a;
+  const winP=h.pa==null?null:(meA?h.pa:1-h.pa),ap=me.points||0,bp=op.points||0;
+  const done=Me.left<=0&&Op.left<=0;let rg=null;
+  if(!done){
+    const bk=lcBucket(h.A,h.B),vi=S.lc?S.lc.pick[bk]:0,pick=T=>vi===0?T.parts:T.partsV[vi-1];
+    rg=simDetail(Me,Op,ap,bp,(+me.roster_id)*977+(+op.roster_id)*31+Math.round(Me.left+Op.left),pick(Me),pick(Op));
+  }
+  const f1=x=>x.toFixed(1),side=(m,q,who)=>`<div class="hit2"><div class="tn">${esc(S.name[m.roster_id])}<span class="you" style="${who==="You"?"":"background:var(--gray);color:var(--on-gray)"}">${who}</span></div><div class="pts">${q?f1(q[1]):(m.points||0).toFixed(2)}</div><div class="sub2">${q?`80% range ${f1(q[0])} to ${f1(q[2])}`:"final score"}</div><div class="sub2">scored so far ${(m.points||0).toFixed(2)}</div></div>`;
+  const cl=winP==null?"var(--line)":winP>=.5?"var(--accent)":"var(--a2)",cl2=winP==null?"var(--line)":winP>=.5?"var(--a2)":"var(--accent)";
+  const inputs=["Sleeper projections","each player’s last 4 games","injury status","the live game clock","points scored so far"].concat(S.cal&&S.cal.kind==="C"?["ESPN betting lines"]:[]);
+  el.innerHTML=`<div class="m mine"><div class="minet">Your game: projected final score</div><div class="row">${side(me,rg&&rg.a,"You")}${side(op,rg&&rg.b,"Opp")}</div>
+    <div class="conf"><b style="color:${winP==null?"var(--mute)":winP>=.5?"var(--ok)":"var(--bad)"}">${winP==null?"…":Math.round(winP*100)+"%"}</b><span>chance you win</span></div>
+    <div class="track" style="margin:6px 0 10px"><i style="width:${winP==null?50:(winP*100).toFixed(1)}%;background:${cl}"></i><i style="flex:1;background:${cl2}"></i></div>
+    <div class="sub2" style="text-align:center">Built from ${inputs.slice(0,-1).join(", ")} and ${inputs[inputs.length-1]}. Ranges cover the middle 80% of simulated finishes.</div></div>`;
 }
 function simWin(A,B,ap,bp,seed){
   const rng=mulberry(seed),N=5000;let w=0;
@@ -760,7 +821,7 @@ function showLive(){
 }
 function showCal(){
   const c=S.cal;
-  $("cal").textContent=c?`Backtest on ${c.n} past games, tested on weeks the model wasn’t fit to: it picked the winner ${Math.round(c.acc*100)}% of the time at kickoff. Brier score ${c.brier.toFixed(3)} (a coin flip is 0.250, lower is better). `+(c.kind==="B"?`Blending in player history improved the score from ${c.brierA.toFixed(3)}. `:"Blending in player history did not help in testing, so projections get full weight. ")+`Projections are scaled by position and the spread ×${c.S0.toFixed(2)} to match what actually happened.`:"";
+  $("cal").textContent=c?`Backtest on ${c.n} past games, tested on weeks the model wasn’t fit to: it picked the winner ${Math.round(c.acc*100)}% of the time at kickoff. Brier score ${c.brier.toFixed(3)} (a coin flip is 0.250, lower is better). `+(c.kind==="A"?"Blending in player history did not help in testing, so projections get full weight. ":`Blending in player history improved the score from ${c.brierA.toFixed(3)}. `)+(c.kind==="C"?`Betting lines from ESPN (game totals and spreads) improved it further, from ${c.brierB.toFixed(3)}. `:(c.cov!=null&&c.cov<.5?"Betting lines weren’t available for enough past games to test. ":"Betting lines did not help in testing. "))+`Projections are scaled by position and the spread ×${c.S0.toFixed(2)} to match what actually happened.`:"";
   updateStack();
 }
 function updateStack(){
@@ -912,7 +973,8 @@ function teamStats(m){
       const c=S.cal,pos=posOf(id);adj=(c?((c.bp&&c.bp[pos])||c.beta):1)*pj;
       const A0=c&&c.a!=null?c.a:W_PROJ;
       w=nn<3?1:A0+(1-A0)*(1-Math.min(1,(nn-3)/(W_FULL_GAMES-3)));
-      const m2=w*adj+(1-w)*hist;
+      let m2=w*adj+(1-w)*hist;
+      if(c&&c.kind==="C"&&c.d){const rr=oddsRatio(team);if(rr!=null)m2*=1+c.d*(rr-1);}
       e=c?{m:m2,sd:c.S0*Math.max(2,c.sa+c.sb*m2)}:{m:m2,sd:e.sd*(hist>1?Math.min(1.4,Math.max(.7,m2/hist)):1)};
     }
     if(nn<3)e={m:e.m,sd:e.sd*1.25}; // first-time starter: role is uncertain, so widen the spread
@@ -955,6 +1017,7 @@ function render(){
   if(S.tut){S.dirty=true;return;} // don't rebuild the cards while the tutorial points at them
   if(S.curves&&JSON.stringify(myPlayers())!==S.sig)renderCurves();
   const by={};S.mu.forEach(m=>(by[m.matchup_id]??=[]).push(m));
+  S.heroData=null;
   $("matchups").innerHTML=Object.values(by).sort((x,y)=>(+y.some(m=>String(m.roster_id)===S.my))-(+x.some(m=>String(m.roster_id)===S.my))).map(([a,b])=>{
     if(!b)return"";
     const A=teamStats(a),B=teamStats(b),ready=S.curves&&S.games&&Object.keys(S.exp).length;
@@ -973,6 +1036,7 @@ function render(){
       } // minutes left = at least 1%
       if(S.sl)ps=(pa===0||pa===1||(aDone&&bDone))?pa:clamp(cdf(((ap+A.slx)-(bp+B.slx))/Math.sqrt(A.slv+B.slv+1e-9)),.01,.99);
     }
+    if(ready&&S.my&&(String(a.roster_id)===S.my||String(b.roster_id)===S.my))S.heroData={a,b,A,B,pa};
     const pc=x=>x==null?"…":Math.round(x*100)+"%";
     const cl=pa==null?["var(--line)","var(--line)"]:pa>=.5?["var(--accent)","var(--a2)"]:["var(--a2)","var(--accent)"]; // lower side is always red
     const side=(m,T,cls,won)=>{
@@ -984,6 +1048,7 @@ function render(){
       <div class="wp"><b class="${pa!=null&&pa<.5?"lo":""}">${pc(pa)}</b><div class="track" role="img" aria-label="Win probability"><i style="width:${pa==null?50:(pa*100).toFixed(1)}%;background:${cl[0]}"></i><i style="flex:1;background:${cl[1]}"></i></div><b class="${pa!=null&&pa>.5?"lo":""}">${pc(pa==null?null:1-pa)}</b></div>${S.sl&&ps!=null?(()=>{const sc=ps>=.5?["var(--accent)","var(--a2)"]:["var(--a2)","var(--accent)"];return `<div class="wp sl" title="Win odds from Sleeper projections only"><b class="${ps<.5?"lo":""}">${pc(ps)}</b><div class="track" role="img" aria-label="Sleeper win probability"><i style="width:${(ps*100).toFixed(1)}%;background:${sc[0]}"></i><i style="flex:1;background:${sc[1]}"></i></div><b class="${ps>.5?"lo":""}">${pc(1-ps)}</b></div><div class="slcap">Sleeper projections only</div>`;})():""}
       <div class="tl"><div${A.cells.some(c=>c.st!=="out"&&c.f>0)?` data-m="${a.roster_id}" role="button" tabindex="0"`:""}>${meter(A)}</div><div class="r"${B.cells.some(c=>c.st!=="out"&&c.f>0)?` data-m="${b.roster_id}" role="button" tabindex="0"`:""}>${meter(B)}</div></div></div>`;
   }).join("")||'<p class="mute">No matchups yet.</p>';
+  drawMine();
 }
 
 // ---- start ----
