@@ -104,7 +104,10 @@ dialog.short{max-height:72vh;overflow-y:auto}
 .win{padding:calc(10px*var(--s)) 0;border-bottom:1px solid var(--line)}.win.past{opacity:.5}
 .wlab{display:flex;align-items:center;gap:calc(7px*var(--s));font-size:calc(13px*var(--s));font-weight:600;color:var(--mute);margin-bottom:calc(7px*var(--s))}
 .wr{display:flex;justify-content:space-between;gap:calc(12px*var(--s))}.wc{flex:1;min-width:0}.wc.r{text-align:right}.dash{color:var(--mute)}
-.seg.big{flex-wrap:wrap;gap:calc(4px*var(--s));margin-top:0}.seg.big i{flex:0 0 calc(32px*var(--s));height:calc(22px*var(--s));border-radius:calc(6px*var(--s))}.seg.big em{font-size:calc(10px*var(--s))}
+.seg.big{flex-wrap:wrap;gap:calc(4px*var(--s));margin-top:0}.seg.big i[data-w]{cursor:pointer}.seg.big i[data-w]:active{transform:scale(.92)}
+.plt{width:100%;margin-top:calc(8px*var(--s));font-size:calc(14px*var(--s))}.plt td{padding:calc(8px*var(--s)) calc(4px*var(--s))}.plt td:last-child{text-align:right;font-weight:600}
+#pl{max-width:min(380px,92vw)}
+.seg.big i{flex:0 0 calc(32px*var(--s));height:calc(22px*var(--s));border-radius:calc(6px*var(--s))}.seg.big em{font-size:calc(10px*var(--s))}
 .nowline{position:relative;height:2px;background:var(--a2);margin:calc(12px*var(--s)) 0;border-radius:1px}
 .nowline b{position:absolute;left:0;top:50%;transform:translateY(-50%);background:var(--a2);color:#fff;font-size:calc(10px*var(--s));padding:calc(1px*var(--s)) calc(8px*var(--s));border-radius:980px;text-transform:uppercase;letter-spacing:.05em}
 svg text{fill:var(--mute);font-size:11px}
@@ -147,7 +150,7 @@ details.nerds[hidden]{display:none}
   <div class="nt"><strong>More accurate game win %</strong><small id="navsub"></small></div>
   <div class="ctl">
     <button class="ghost icon" id="theme" aria-label="Switch to dark mode" title="Switch light or dark mode">☾</button>
-    <button class="ghost icon" id="eye" aria-label="How projections are calculated" title="How projections are calculated">?</button>
+    <button class="ghost icon" id="eye" aria-label="How the numbers are calculated" title="How the numbers are calculated">?</button>
     <button class="ghost icon" id="tb" aria-label="Settings" title="Settings">⚙︎</button>
   </div>
 </header>
@@ -176,27 +179,44 @@ details.nerds[hidden]{display:none}
 </details>
 
 <dialog id="ex">
-  <div style="display:flex;justify-content:space-between;align-items:center"><strong>How projections are calculated</strong><button class="ghost" id="exx">Close</button></div>
-  <h4>Adjusted projection for each starter</h4>
-  <div class="stack" role="img" aria-label="60% projection based on matchup, 20% historical points by position rank, 20% player’s own history">
+  <div style="display:flex;justify-content:space-between;align-items:center"><strong>How the numbers are calculated</strong><button class="ghost" id="exx">Close</button></div>
+
+  <h4>1. Each player’s expected points</h4>
+  <p style="margin:2px 0">Start with Sleeper’s projection, scored with your league’s rules and scaled by position to match how your league’s starters really scored. Then blend in the player’s history. The mix below is fitted from your league’s past games, not set by hand.</p>
+  <div class="stack" role="img" aria-label="Blend of projection and history">
     <div id="sk1" style="flex:60;background:var(--accent);color:var(--on-acc)">60%</div>
     <div id="sk2" style="flex:20;background:var(--yel);color:#1d1d1f">20%</div>
     <div id="sk3" style="flex:20;background:var(--gray);color:var(--on-gray)">20%</div>
   </div>
-  <div class="leg" style="flex-direction:column;gap:calc(3px*var(--s));margin:calc(8px*var(--s)) 0 0;font-size:calc(13px*var(--s))">
-    <span style="--c:var(--accent)">Projection based on matchup</span>
-    <span style="--c:var(--yel)">Average points scored by players at the same position rank (rank from the last 4 games)</span>
-    <span style="--c:var(--gray)">The player’s own historical average</span>
+  <div class="leg" style="flex-direction:column;gap:3px;margin:8px 0 0;font-size:13px">
+    <span id="lg1" style="--c:var(--accent)">Sleeper projection</span>
+    <span id="lg2" style="--c:var(--yel)">Average points at the player’s position rank (rank from the last 4 games)</span>
+    <span id="lg3" style="--c:var(--gray)">The player’s own average</span>
   </div>
+  <small id="exfit"></small>
+
+  <h4>2. Game environment</h4>
+  <p style="margin:2px 0">ESPN’s betting lines (each game’s total and spread) show how many points a team is expected to score. The page checks whether they improve predictions on past weeks and uses them only if they do. <span id="exlines"></span></p>
+
+  <h4>3. Who is actually playing</h4>
   <ul class="ex">
-    <li>Fewer than 3 games of history: <b>100%</b> projection based on matchup, with a wider spread. It fades back to the usual blend by 8 games.</li>
-    <li>Out, Suspended, PUP: <b>0 points</b>. Tagged IR but projected: counts at <b>75%</b>.</li>
-    <li>Questionable or Doubtful: counts at <b>50%</b>.</li>
-    <li>Out mid-game: the live score keeps what they scored. The table still shows their pre-game projection.</li>
-    <li>Bench players are never counted.</li>
+    <li>A player who has already scored in a game is treated as playing.</li>
+    <li>Out, Suspended, PUP: 0 points. On a bye: no projection.</li>
+    <li>Out mid-game: the live score keeps what they scored, and the pre-game table keeps their original projection.</li>
+    <li>Fewer than 3 games of history: the projection alone, with a 25% wider spread.</li>
+    <li>IR but projected: counted at 75%. Questionable or Doubtful: 50%.</li>
   </ul>
-  <p id="cal" class="mute" style="font-size:calc(13px*var(--s))"></p>
-  <p id="live" class="mute" style="font-size:calc(13px*var(--s))"></p>
+  <small>The last two percentages and the 25% are my assumptions, not learned from your data. Injury status comes from Sleeper when the page loads. Bench players are never counted.</small>
+
+  <h4>4. Uncertainty</h4>
+  <p style="margin:2px 0">Each player’s spread comes from how far real scores landed from projections in past weeks, by projection size. It shrinks as their game ends, and it is skewed, so remaining points can’t go below zero.</p>
+
+  <h4>5. Win chance</h4>
+  <p style="margin:2px 0">The page simulates the rest of every starter’s game 5,000 times and counts how often each team finishes ahead. Odds stay between 1% and 99% while either team has time left, and reach 100% only once a team is ahead and its opponent has no time left. During games it also tests pace-aware versions, where a player’s scoring so far nudges his rest-of-game forecast, and it keeps whichever version scores better.</p>
+
+  <h4>How it checks itself</h4>
+  <p id="cal" class="mute" style="font-size:calc(13px*var(--s));margin:2px 0"></p>
+  <p id="live" class="mute" style="font-size:calc(13px*var(--s));margin:6px 0 0"></p>
 </dialog>
 <dialog id="rd">
   <div style="display:flex;justify-content:space-between;align-items:center;gap:calc(8px*var(--s))"><strong id="rdt"></strong><button class="ghost" id="rdx">Close</button></div>
@@ -212,6 +232,11 @@ details.nerds[hidden]{display:none}
   <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><strong>Game windows</strong><button class="ghost" id="wnx">Close</button></div>
   <div class="wh"><span id="wna"></span><span id="wnc"></span></div>
   <div id="wnb"></div>
+</dialog>
+<dialog id="pl" class="short">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:calc(8px*var(--s))"><strong id="plt"></strong><button class="ghost" id="plx">Close</button></div>
+  <small id="pls"></small>
+  <table class="plt"><tbody id="plb"></tbody></table>
 </dialog>
 <dialog id="rm" class="short">
   <div style="display:flex;justify-content:space-between;align-items:center;gap:calc(8px*var(--s))"><strong id="rmt"></strong><button class="ghost" id="rmx">Close</button></div>
@@ -446,6 +471,7 @@ function openWindows(a,b){
     drawWindows();$("wn").showModal();
 }
 function drawWindows(){
+  S.wreg=[];
   const {a,b}=S.wn,D=[S.det[a],S.det[b]];if(!D[0]||!D[1])return;
   $("wna").innerHTML=esc(D[0].name)+`<span class="wsc">${(D[0].m.points||0).toFixed(2)}</span>`;
   $("wnc").innerHTML=`<span class="wsc">${(D[1].m.points||0).toFixed(2)}</span>`+esc(D[1].name);
@@ -460,7 +486,7 @@ function drawWindows(){
     d.T.cells.forEach(c=>{if(c.st==="out"||c.st==="bye")return;const k=of[c.team];if(k)W[k].cells[i].push(c);});
     const st=d.m.starters||[];
     (d.m.players||[]).filter(id=>!st.includes(id)).map(id=>({id,pl:S.players[id]||{}})).sort((x,y)=>GROUP(x.pl.pos||"FLEX")-GROUP(y.pl.pos||"FLEX")).forEach(({id,pl})=>{
-      const team=pl.team||(isNaN(id)?id:null),k=team&&of[team];if(k)W[k].cells[i].push({st:"bench",lab:pl.pos||"",team,name:""});
+      const team=pl.team||(isNaN(id)?id:null),k=team&&of[team];if(k)W[k].cells[i].push({st:"bench",lab:pl.pos||"",team,id,act:((d.m.players_points||{})[id])||0,name:pl.name||id,rk:S.rank[id]});
     });
   });
   const line='<div class="nowline" role="separator" aria-label="Now"><b>Now</b></div>';
@@ -468,13 +494,29 @@ function drawWindows(){
   for(const w of list){
     const past=w.states.every(x=>x==="post"),live=w.states.some(x=>x==="in");
     if(!past&&!placed){h+=line;placed=true;}
-    const col=cs=>cs.length?`<div class="seg big">${cs.map(c=>segCell(c,true)).join("")}</div>`:'<span class="dash">–</span>';
+    const col=cs=>cs.length?`<div class="seg big">${cs.map(c=>segCell(c,true,S.wreg.push(c)-1)).join("")}</div>`:'<span class="dash">–</span>';
     h+=`<div class="win${past?" past":""}"><div class="wlab">${live?'<span class="ldot"></span>':""}${esc(w.label)}</div><div class="wr"><div class="wc">${col(w.cells[0])}</div><div class="wc r">${col(w.cells[1])}</div></div></div>`;
   }
   if(!placed)h+=line;
   $("wnb").innerHTML=h;
 }
 $("wnx").onclick=()=>$("wn").close();
+$("plx").onclick=()=>$("pl").close();
+$("wnb").onclick=e=>{const i=e.target.closest("[data-w]");if(i)openPlayer(+i.dataset.w);};
+$("wnb").onkeydown=e=>{if(e.key==="Enter"){const i=e.target.closest("[data-w]");if(i)openPlayer(+i.dataset.w);}};
+function openPlayer(k){
+  const c=S.wreg&&S.wreg[k];if(!c||!c.id)return;
+  const pl=S.players[c.id]||{},x=initProj(c.id,c.act||0),g=(S.gi&&S.gi[c.team])||null;
+  const bench=c.st==="bench",started=x.gs==="in"||x.gs==="post",f1=v=>v==null?"–":v.toFixed(1);
+  $("plt").innerHTML=esc(pl.name||c.id)+RK(S.rank[c.id]);
+  $("pls").textContent=[pl.pos,pl.team,bench?"Bench":"Starter"].filter(Boolean).join(" · ");
+  const rows=[["Matchup",g?g.vs:(x.bye?"Bye week":"–")],["Game",g?g.lab:"–"]]
+    .concat(pl.inj?[["Status",pl.inj]]:[])
+    .concat([["Scored so far",started?(c.act||0).toFixed(1):"–"],["Adjusted proj.",x.bye?"–":f1(x.pre)]])
+    .concat(S.sl?[["Sleeper proj.",x.bye?"–":f1(x.sl)]]:[]);
+  $("plb").innerHTML=rows.map(r=>`<tr><td>${r[0]}</td><td>${esc(r[1])}</td></tr>`).join("");
+  $("pl").showModal();
+}
 (()=>{
   let tm=null,x0=0,y0=0,fired=false;const box=$("matchups");
   box.addEventListener("pointerdown",e=>{
@@ -827,6 +869,12 @@ function showCal(){
 function updateStack(){
   const c=S.cal,a=c&&c.a!=null?c.a:W_PROJ,r=c&&c.r!=null?c.r:W_RANK,p=Math.round(a*100),h=100-p,rk=Math.round(h*r),ow=h-rk;
   [["sk1",p],["sk2",rk],["sk3",ow]].forEach(([id,v])=>{const el=$(id);if(el){el.style.flex=String(v||.001);el.textContent=v?v+"%":"";}});
+  const L=(id,t)=>{const el=$(id);if(el)el.textContent=t;};
+  L("lg1",`${p}% Sleeper projection, scaled by position`);
+  L("lg2",`${rk}% average points at the player’s position rank (rank from the last 4 games)`);
+  L("lg3",`${ow}% the player’s own average`);
+  L("exfit",c?`Fitted on ${c.n} past games from your league and last season. ${c.kind==="A"?"History didn’t help in testing, so the projection gets full weight.":""}`:"Until the backtest finishes, a default mix is shown.");
+  L("exlines",!c?"Being tested now.":c.kind==="C"?`In your league they helped, so they are included.`:(c.cov!=null&&c.cov<.5?"They weren’t available for enough past games to test, so they are not used.":"In your league they didn’t help, so they are not used."));
 }
 $("wk").onchange=async function(){
   S.view=+this.value;S.mu=null;S.proj={};S.games=null;
@@ -960,9 +1008,9 @@ function teamStats(m){
     const raw=S.slots[si]||posOf(id)||"FLEX",lab=SLOT[raw]||raw,g=GROUP(raw),nm=(pl&&pl.name)||id;
     const nn=(S.pl[id]&&S.pl[id].n)||0,st0=(S.gst&&team&&S.gst[team])||"post",gs=(S.gst&&team&&S.gst[team])||"bye";
     const act=(m.starters_points||[])[si]||0;
-    if(S.games&&(!team||S.gst[team]==null)){cells.push({f:0,st:"bye",gs:"bye",team,name:nm,rk:S.rank[id],lab,g,si,d:{bye:1,live:act}});continue;} // bye week: no game, no projection
+    if(S.games&&(!team||S.gst[team]==null)){cells.push({f:0,st:"bye",gs:"bye",team,id,act,name:nm,rk:S.rank[id],lab,g,si,d:{bye:1,live:act}});continue;} // bye week: no game, no projection
     const isOut=!!(pl&&OUT.includes(pl.inj)&&!(pl.inj==="IR"&&S.proj[id]>=3)),mid=isOut&&st0!=="pre"&&act>0; // mid = left a game hurt
-    if(isOut&&!mid){liveSum+=act;cells.push({f:0,st:"out",gs,team,name:nm,rk:S.rank[id],lab,g,si,d:{out:1,why:pl.inj,live:act}});continue;}
+    if(isOut&&!mid){liveSum+=act;cells.push({f:0,st:"out",gs,team,id,act,name:nm,rk:S.rank[id],lab,g,si,d:{out:1,why:pl.inj,live:act}});continue;}
     const gl=mid?0:(S.games&&team&&S.games[team]!=null?S.games[team]:0);
     let e=S.exp[id];
     if(!e){const p=posOf(id),c=p&&S.curves&&S.curves[p];e=c&&c.length?{m:c[Math.min(c.length-1,35)].mean,sd:Math.sqrt(S.pvar[p]||36)}:{m:5,sd:6};}
@@ -992,14 +1040,15 @@ function teamStats(m){
       [[pv1,3],[pv2,1.5]].forEach(([arr,tau])=>{const m2=pe*f*(tau*e.m+act)/(tau+el);if(m2>0.01)arr.push({mu:m2,v:Math.max(vv,m2*.05)});});
     }
     const live=act+(mid?0:pe*e.m*f);liveSum+=live;
-    cells.push({f,st:mid?"out":st0,gs,team,name:nm,rk:S.rank[id],lab,g,si,d:{proj:adj,hist,w,p,pre:p*e.m,live,mid,sl:pj,act}});
+    cells.push({f,st:mid?"out":st0,gs,team,id,act,name:nm,rk:S.rank[id],lab,g,si,d:{proj:adj,hist,w,p,pre:p*e.m,live,mid,sl:pj,act}});
   }
   cells.sort((a,b)=>a.g-b.g||a.si-b.si);
   const total=cells.filter(c=>c.st!=="out").length*60;
   v+=4*(total?left/total:0); // unmodeled game-script noise
   return{left,total,slx,slv,parts,partsV:[pv1,pv2],prog,extra:4*(total?left/total:0),rank,proj:(m.points||0)+exp,started:cells.some(c=>c.gs==="in"||c.gs==="post"),mean:(m.points||0)+exp,v,cells};
 }
-function segCell(c,priv){
+function segCell(c,priv,key){const h=segCell0(c,priv);return key==null?h:h.replace("<i ",`<i data-w="${key}" tabindex="0" role="button" `);}
+function segCell0(c,priv){
   const l=`<em>${esc(c.lab)}</em>`,t=priv?esc(c.lab):esc(c.name)+(c.rk?` [${c.rk}]`:"");
   if(c.st==="bye")return `<i class="sg" title="${t}: bye">${l}</i>`;
   if(c.st==="bench")return `<i class="sb" title="${t}: bench">${l}</i>`;
