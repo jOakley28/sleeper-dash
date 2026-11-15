@@ -101,7 +101,7 @@ dialog.short{max-height:72vh;overflow-y:auto}
 .nav small{max-height:0;opacity:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:calc(12px*var(--s));transition:max-height .3s,opacity .3s}
 .nav.scrolled small{max-height:calc(20px*var(--s));opacity:1}
 .wh{display:flex;justify-content:space-between;gap:calc(12px*var(--s));margin:calc(12px*var(--s)) 0 calc(4px*var(--s));font-size:calc(13px*var(--s));font-weight:600}.wh span:last-child{text-align:right}
-.win{padding:calc(10px*var(--s)) 0;border-bottom:1px solid var(--line)}.win.past{opacity:.5}
+.win{padding:calc(10px*var(--s)) 0;border-bottom:1px solid var(--line)}.win.past{opacity:.5}.win.empty{opacity:.38;padding:calc(7px*var(--s)) 0}.win.empty .wlab{margin:0}
 .wlab{display:flex;align-items:center;gap:calc(7px*var(--s));font-size:calc(13px*var(--s));font-weight:600;color:var(--mute);margin-bottom:calc(7px*var(--s))}
 .wr{display:flex;justify-content:space-between;gap:calc(12px*var(--s))}.wc{flex:1;min-width:0}.wc.r{text-align:right}.dash{color:var(--mute)}
 .seg.big{flex-wrap:wrap;gap:calc(4px*var(--s));margin-top:0}.seg.big i[data-w]{cursor:pointer}.seg.big i[data-w]:active{transform:scale(.92)}
@@ -250,10 +250,10 @@ details.nerds[hidden]{display:none}
 <dialog id="pj">
   <div style="display:flex;justify-content:space-between;align-items:center;gap:calc(8px*var(--s))"><strong id="pjt"></strong><button class="ghost" id="pjx">Close</button></div>
   <table class="pjt">
-    <colgroup><col style="width:36%"><col style="width:16%"><col style="width:16%"><col style="width:16%"><col style="width:16%"></colgroup>
-    <thead><tr><th>Player</th><th title="Projection based on the player’s matchup, scaled to your league’s results">Matchup proj.</th><th title="Historical points by position rank and the player’s own average">History</th><th title="Share of matchup projection / history">Blend %</th><th title="Expected points before kickoff">Pre-game</th></tr></thead>
+    <colgroup><col style="width:40%"><col style="width:20%"><col style="width:20%"><col style="width:20%"></colgroup>
+    <thead><tr><th>Player</th><th title="Projection based on the player’s matchup, scaled to your league’s results">Matchup proj.</th><th title="Historical points by position rank and the player’s own average">History</th><th title="Expected points before kickoff">Pre-game</th></tr></thead>
     <tbody id="pjb"></tbody>
-    <tfoot><tr><td colspan="4">Total (sum of Pre-game)</td><td id="pjf"></td></tr></tfoot>
+    <tfoot><tr><td colspan="3">Total (sum of Pre-game)</td><td id="pjf"></td></tr></tfoot>
   </table>
   <small id="pjn"></small><br><small>[12] is the player’s rank at their position by average points over their last 4 games. Players with fewer than 3 games use Sleeper’s ranking.</small>
 </dialog>
@@ -402,9 +402,9 @@ function openProj(rid){
   const d=S.det[rid];if(!d)return;const T=d.T,c=S.cal,f1=x=>x==null?"–":x.toFixed(1);
   $("pjt").innerHTML=esc(d.name)+` <span class="rec">(${S.rec[rid]||"0-0"})</span>`;
   $("pjb").innerHTML=T.cells.map(k=>{const x=k.d,who=`<i>${esc(k.lab)}</i>${esc(k.name)}${RK(k.rk)}`;
-    if(x.bye)return `<tr><td>${who}<small style="color:var(--mute)">bye week</small></td><td>–</td><td>–</td><td>–</td><td>–</td></tr>`;
-    if(x.out)return `<tr class="outr"><td>${who}</td><td colspan="3">Out (${esc(x.why)})</td><td>0.0</td></tr>`;
-    return `<tr${x.mid?' class="outr"':""}><td>${who}${x.mid?"<small>left game</small>":""}</td><td>${f1(x.proj)}</td><td>${f1(x.hist)}</td><td>${Math.round(x.w*100)}/${100-Math.round(x.w*100)}</td><td>${f1(x.pre)}</td></tr>`;}).join("");
+    if(x.bye)return `<tr><td>${who}<small style="color:var(--mute)">bye week</small></td><td>–</td><td>–</td><td>–</td></tr>`;
+    if(x.out)return `<tr class="outr"><td>${who}</td><td colspan="2">Out (${esc(x.why)})</td><td>0.0</td></tr>`;
+    return `<tr${x.mid?' class="outr"':""}><td>${who}${x.mid?"<small>left game</small>":""}</td><td>${f1(x.proj)}</td><td>${f1(x.hist)}</td><td>${f1(x.pre)}</td></tr>`;}).join("");
   $("pjf").textContent=T.rank.toFixed(1);
   $("pjn").textContent="Pre-game = matchup projection × blend + history × blend, reduced for injury risk. It is fixed once a game starts."+(c?" Projections are scaled by position to match what your league’s starters scored.":"");
   $("pj").showModal();
@@ -460,11 +460,13 @@ $("rdsw").onclick=e=>{const b=e.target.closest("button");if(!b||!S.rd)return;if(
   dl.addEventListener("touchstart",e=>{if(e.touches.length!==1)return;x0=e.touches[0].clientX;y0=e.touches[0].clientY;on=true;},{passive:true});
   dl.addEventListener("touchend",e=>{if(!on||!S.rd)return;on=false;const t=e.changedTouches[0],dx=t.clientX-x0,dy=t.clientY-y0;if(Math.abs(dx)<50||Math.abs(dx)<Math.abs(dy)*1.5)return;const next=dx<0?"live":"pre";if(next!==S.rd.mode){S.rd.mode=next;drawRoster(false,dx<0?"l":"r");}},{passive:true});})();
 $("rmx").onclick=()=>$("rm").close();
-function winKey(iso){
+const WSLOTS=["Thursday","Friday","Saturday","Sunday · International","Sunday · Early","Sunday · Afternoon","Sunday · Late","Monday","Tuesday","Wednesday"];
+function winKey(iso,intl){
   const d=new Date(iso),p=new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",weekday:"long",hour:"numeric",hourCycle:"h23"}).formatToParts(d);
   const wd=p.find(x=>x.type==="weekday").value,hr=+p.find(x=>x.type==="hour").value;
-  const slot=wd==="Sunday"?(hr<15?"Early":hr<19?"Afternoon":"Late"):"";
-  return{key:wd+slot,label:wd+(slot?" · "+slot:""),t:d.getTime()};
+  // Sunday splits by kickoff time (Eastern); games played overseas, or kicking off before noon, are the international window
+  const label=wd==="Sunday"?"Sunday · "+((intl||hr<12)?"International":hr<15?"Early":hr<19?"Afternoon":"Late"):wd;
+  return{key:label,label,order:Math.max(0,WSLOTS.indexOf(label))};
 }
 function openWindows(a,b){
   if(!S.det[a]||!S.det[b])return;S.wn={a,b};
@@ -476,12 +478,13 @@ function drawWindows(){
   $("wna").innerHTML=esc(D[0].name)+`<span class="wsc">${(D[0].m.points||0).toFixed(2)}</span>`;
   $("wnc").innerHTML=`<span class="wsc">${(D[1].m.points||0).toFixed(2)}</span>`+esc(D[1].name);
   const W={},of={};
+  WSLOTS.forEach((l,i)=>W[l]={label:l,order:i,cells:[[],[]],states:[]});
+  if(!Object.values(S.gi||{}).some(g=>g.date)){$("wnb").innerHTML='<p class="mute">Game times aren’t available yet.</p>';return;}
   for(const [team,g] of Object.entries(S.gi||{})){
-    if(!g.date)continue;const k=winKey(g.date);of[team]=k.key;
-    const o=W[k.key]??={label:k.label,t:k.t,cells:[[],[]],states:[]};o.t=Math.min(o.t,k.t);o.states.push(g.state);
+    if(!g.date)continue;const k=winKey(g.date,g.intl);of[team]=k.key;
+    (W[k.key]??={label:k.label,order:k.order,cells:[[],[]],states:[]}).states.push(g.state);
   }
-  const list=Object.values(W).sort((x,y)=>x.t-y.t);
-  if(!list.length){$("wnb").innerHTML='<p class="mute">Game times aren’t available yet.</p>';return;}
+  const list=Object.values(W).sort((x,y)=>x.order-y.order);
   D.forEach((d,i)=>{
     d.T.cells.forEach(c=>{if(c.st==="out"||c.st==="bye")return;const k=of[c.team];if(k)W[k].cells[i].push(c);});
     const st=d.m.starters||[];
@@ -492,6 +495,7 @@ function drawWindows(){
   const line='<div class="nowline" role="separator" aria-label="Now"><b>Now</b></div>';
   let h="",placed=false;
   for(const w of list){
+    if(!w.states.length){h+=`<div class="win empty"><div class="wlab">${esc(w.label)}<span class="dash" style="margin-left:auto">No games</span></div></div>`;continue;}
     const past=w.states.every(x=>x==="post"),live=w.states.some(x=>x==="in");
     if(!past&&!placed){h+=line;placed=true;}
     const col=cs=>cs.length?`<div class="seg big">${cs.map(c=>segCell(c,true,S.wreg.push(c)-1)).join("")}</div>`:'<span class="dash">–</span>';
@@ -609,7 +613,8 @@ async function loadGames(){
     const ab=x=>ABBR[x.team.abbreviation]||x.team.abbreviation,left=minsLeft(e),t=e.status.type;
     S.games[ab(a)]=left;S.games[ab(h)]=left;S.gst[ab(a)]=t.state;S.gst[ab(h)]=t.state;
     const lab=t.state==="pre"?new Date(e.date).toLocaleString([],{weekday:"short",hour:"numeric",minute:"2-digit"}):t.state==="post"?"Final":(t.shortDetail||t.detail);
-    S.gi[ab(a)]={vs:"@ "+ab(h),lab,date:e.date,state:t.state};S.gi[ab(h)]={vs:"vs "+ab(a),lab,date:e.date,state:t.state};
+    const vn=e.competitions[0].venue,intl=!!(vn&&vn.address&&vn.address.country&&!/^(usa?|united states)$/i.test(vn.address.country));
+    S.gi[ab(a)]={vs:"@ "+ab(h),lab,date:e.date,state:t.state,intl};S.gi[ab(h)]={vs:"vs "+ab(a),lab,date:e.date,state:t.state,intl};
     const as=+a.score||0,hs=+h.score||0,live=t.state!=="pre"&&as!==hs;
     const tr=(x,me,ot)=>`<div class="tmr${live?(me>ot?" lead":" dim"):""}"><span>${ab(x)}</span><span>${x.score||0}</span></div>`;
     return `<div class="gm"><div>${tr(a,as,hs)}${tr(h,hs,as)}</div><div class="gst"><b>${esc(lab)}</b>${t.state==="post"?"":`<span class="${left>0?"ml":""}">${left>0?Math.max(5,Math.round(left/5)*5)+" minutes remaining":"0 minutes remaining"}</span>`}</div></div>`;
@@ -1067,7 +1072,7 @@ function render(){
   if(S.curves&&JSON.stringify(myPlayers())!==S.sig)renderCurves();
   const by={};S.mu.forEach(m=>(by[m.matchup_id]??=[]).push(m));
   S.heroData=null;
-  $("matchups").innerHTML=Object.values(by).sort((x,y)=>(+y.some(m=>String(m.roster_id)===S.my))-(+x.some(m=>String(m.roster_id)===S.my))).map(([a,b])=>{
+  $("matchups").innerHTML=Object.values(by).map(([a,b])=>{
     if(!b)return"";
     const A=teamStats(a),B=teamStats(b),ready=S.curves&&S.games&&Object.keys(S.exp).length;
     let pa=null,ps=null;
