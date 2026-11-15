@@ -126,11 +126,9 @@ details.nerds[hidden]{display:none}
 .tcap{position:fixed;left:50%;bottom:calc(64px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:max-content;max-width:88vw;padding:calc(12px*var(--s)) calc(20px*var(--s));border-radius:calc(22px*var(--s));background:rgba(28,28,30,.9);color:#fff;font-size:calc(15px*var(--s));font-weight:600;text-align:center;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);box-shadow:0 10px 40px rgba(0,0,0,.35)}
 .tcap.top{bottom:auto;top:calc(72px + env(safe-area-inset-top,0px))}
 .tdots{display:flex;justify-content:center;gap:calc(6px*var(--s));margin-top:calc(8px*var(--s))}.tdots b{width:calc(6px*var(--s));height:calc(6px*var(--s));border-radius:50%;background:rgba(255,255,255,.3);transition:background .3s}.tdots b.on{background:#fff}
-.mine{margin-bottom:calc(18px*var(--s))}.minet{font-size:calc(13px*var(--s));font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:.05em;margin:0 calc(4px*var(--s)) calc(10px*var(--s))}
-.hit2{flex:1;min-width:0;background:var(--fill);border-radius:calc(18px*var(--s));padding:calc(12px*var(--s)) calc(14px*var(--s))}.row .hit2:last-child{text-align:right}
-.conf{display:flex;align-items:baseline;justify-content:center;gap:calc(8px*var(--s));margin-top:calc(14px*var(--s))}.conf b{font-size:calc(46px*var(--s));font-weight:700;letter-spacing:-.04em;line-height:1}.conf span{font-size:calc(15px*var(--s));color:var(--mute)}
 .wp.sl{margin-top:calc(8px*var(--s))}.wp.sl b{font-style:italic;font-weight:600;font-size:calc(13px*var(--s));min-width:calc(40px*var(--s))}.wp.sl .track{height:calc(4px*var(--s))}
 .slcap{text-align:center;font-size:calc(11px*var(--s));font-style:italic;color:var(--mute);margin-top:calc(2px*var(--s))}
+#rawdata{position:fixed;inset:0;z-index:200;margin:0;padding:12px;overflow:auto;background:#fff;color:#000;white-space:pre-wrap;font:12px/1.35 ui-monospace,Menlo,monospace;-webkit-user-select:text;user-select:text}
 #lsel,#myt{width:100%;box-shadow:none;background:var(--fill)}.addrow{display:flex;gap:calc(8px*var(--s));margin-top:calc(8px*var(--s))}.addrow input{flex:1;min-width:0;padding:calc(9px*var(--s)) calc(14px*var(--s));border:0;border-radius:calc(980px*var(--s));background:var(--fill);color:var(--ink);font:inherit;font-size:calc(15px*var(--s))}
 .you{font-size:calc(10px*var(--s));font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:var(--blue);color:#fff;border-radius:calc(980px*var(--s));padding:calc(1px*var(--s)) calc(7px*var(--s));margin-left:calc(5px*var(--s));vertical-align:calc(1px*var(--s));font-style:normal}
 .hit.win{background:color-mix(in srgb,var(--accent) 14%,var(--surface))}
@@ -160,7 +158,6 @@ details.nerds[hidden]{display:none}
   <label class="wkpick"><span>Week</span><select id="wk"></select></label>
 </section>
 
-<div id="mine"></div>
 <h2 id="mh">Matchups</h2>
 <div id="matchups"><p class="mute">Loading league…</p></div>
 <div class="leg" style="margin:calc(4px*var(--s)) calc(4px*var(--s)) 0"><span style="--c:var(--accent)">Not started</span><span style="--c:var(--yel)">In progress</span><span style="--c:var(--gray)">Played</span><span style="--c:var(--a2)">Out, in lineup</span></div>
@@ -267,6 +264,9 @@ details.nerds[hidden]{display:none}
   <select id="myt" aria-label="My team"></select>
   <h4>Sleeper stats</h4>
   <label class="tog" style="justify-content:space-between"><span>Show Sleeper projections, Sleeper win odds, and Stats for nerds</span><input type="checkbox" id="slt"></label>
+  <h4>Data export</h4>
+  <div class="addrow"><button class="ghost" id="expj" style="padding-left:0">Copy JSON</button><button class="ghost" id="expc">Download CSV</button></div>
+  <small id="expm">One table: a row per player, with team, game, and projection columns. Developers: call window.fantasyData() in the page, or open it with ?data=json.</small>
   <h4>Tutorial</h4>
   <button class="ghost" id="tutbtn" style="padding-left:0">Replay the tutorial</button>
   <details style="margin-top:calc(16px*var(--s))"><summary>Troubleshooting</summary><div class="sc"><table id="diag"><thead><tr><th>Endpoint</th><th>Result</th><th>Detail</th></tr></thead><tbody></tbody></table></div></details>
@@ -293,7 +293,7 @@ const DOUBT=["Questionable","Doubtful"],DOUBT_MULT=0.5,IR_P=0.75; // IR_P: chanc
 const W_FULL_GAMES=8; // games of history needed before history gets its full 40% weight // chance-to-play factor for uncertain players
 const W_RANK=0.5; // weight on the rank-curve value vs. the player's own average
 const COL={QB:'#e4572e',RB:'#2e86ab',WR:'#3bb273',TE:'#9b5de5',K:'#e9b44c',DEF:'#7a8b99'};
-const S={games:null,curves:null,pl:{},pvar:{},players:{},exp:{},proj:{},mu:null,cal:null,gi:{},slots:[],det:{},snap:{},rec:{},rank:{},my:""};
+const S={games:null,curves:null,pl:{},pvar:{},players:{},exp:{},proj:{},mu:null,cal:null,gi:{},slots:[],det:{},snap:{},rec:{},rank:{},my:"",wp:{}};
 let diag={}, timer=null, building=false;
 
 function setDiag(k,ok,d){diag[k]={ok,d};$("diag").tBodies[0].innerHTML=Object.entries(diag).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="${v.ok?"ok":"bad"}">${v.ok?"Works":"Failed"}</td><td>${esc(v.d)}</td></tr>`).join("");}
@@ -322,6 +322,52 @@ $("ladd").onclick=async()=>{
 S.sl=!!lsGet("sleeper",false);$("slt").checked=S.sl;
 function applySl(){$("nerds").hidden=!S.sl;}applySl();
 $("slt").onchange=()=>{S.sl=$("slt").checked;lsSet("sleeper",S.sl);applySl();render();};
+// ---- Data export: one flat table (a row per player, with team and game columns repeated) ----
+window.fantasyDataReady=new Promise(r=>{window.dataReadyResolve=r;});
+const FRAME_COLS=["season","week","league_id","league_name","roster_id","team_name","record","is_my_team","opponent_roster_id","opponent_name","team_points","team_projected_final","team_projected_pregame","team_win_prob","team_win_prob_sleeper_style","team_minutes_remaining","player_id","player_name","position","slot","is_starter","nfl_team","nfl_opponent","game_status","game_label","injury_status","position_rank_last4","score","sleeper_proj_pregame","adjusted_proj_pregame","adjusted_proj_left","adjusted_proj_live","sleeper_proj_live","fraction_game_remaining","is_bye"];
+function buildFrame(){
+  if(!S.mu||!S.det||!S.curves||!S.games)return null;
+  const r2=x=>x==null||isNaN(x)?null:Math.round(x*100)/100,rows=[];
+  for(const m of S.mu){
+    const d=S.det[m.roster_id];if(!d)continue;
+    const op=S.mu.find(x=>x.matchup_id===m.matchup_id&&x.roster_id!==m.roster_id),wp=S.wp[m.roster_id]||{};
+    const base={season:S.season,week:S.view,league_id:LID,league_name:S.leagueName||"",roster_id:m.roster_id,team_name:d.name,record:S.rec[m.roster_id]||"",is_my_team:String(m.roster_id)===S.my,
+      opponent_roster_id:op?op.roster_id:null,opponent_name:op?S.name[op.roster_id]:null,team_points:r2(m.points||0),team_projected_final:r2(d.T.proj),team_projected_pregame:r2(d.T.rank),
+      team_win_prob:r2(wp.p),team_win_prob_sleeper_style:r2(wp.s),team_minutes_remaining:r2(d.T.left)};
+    const add=(id,slot,starter,act,rk,x,team,cellSt)=>{
+      const pl=S.players[id]||{},g=(S.gi&&S.gi[team])||{},rem=x.bye?null:x.pre*x.f;
+      rows.push({...base,player_id:id,player_name:pl.name||id,position:pl.pos||(isNaN(id)?"DEF":""),slot,is_starter:starter,nfl_team:team||"",nfl_opponent:g.vs||"",
+        game_status:x.bye?"bye":(g.state||x.gs),game_label:g.lab||"",injury_status:pl.inj||"",position_rank_last4:rk||null,score:r2(act),
+        sleeper_proj_pregame:x.bye?null:r2(x.sl),adjusted_proj_pregame:x.bye?null:r2(x.pre),adjusted_proj_left:r2(rem),adjusted_proj_live:x.bye?null:r2(act+rem),
+        sleeper_proj_live:x.bye?null:r2(act+(x.sl||0)*x.f),fraction_game_remaining:x.bye?null:r2(x.f),is_bye:!!x.bye});
+    };
+    d.T.cells.forEach(c=>add(c.id,c.lab,true,c.act||0,c.rk,initProj(c.id,c.act||0),c.team));
+    const st=m.starters||[];
+    (m.players||[]).filter(id=>!st.includes(id)).forEach(id=>{
+      const pl=S.players[id]||{},act=((m.players_points||{})[id])||0,team=pl.team||(isNaN(id)?id:null);
+      add(id,"BN",false,act,S.rank[id],initProj(id,act),team);
+    });
+  }
+  const c=S.cal,lc=S.lc;
+  return{meta:{generated_at:new Date().toISOString(),season:S.season,week:S.view,league_id:LID,league_name:S.leagueName||"",my_roster_id:S.my||null,
+      model:c?{backtest_games:c.n,kind:c.kind,uses_betting_lines:c.kind==="C",brier:r2(c.brier),pick_rate:r2(c.acc),spread_scale:r2(c.S0)}:null,
+      live_check:lc?{scored_predictions:lc.n,brier_ours:r2(lc.ours),brier_sleeper_style:r2(lc.sl)}:null},columns:FRAME_COLS,rows};
+}
+function toCSV(f){
+  const q=v=>{if(v==null)return"";v=String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
+  return f.columns.join(",")+"\n"+f.rows.map(r=>f.columns.map(c=>q(r[c])).join(",")).join("\n");
+}
+window.fantasyData=()=>buildFrame()||{error:"not ready: matchups or projections are still loading"};
+window.fantasyDataCSV=()=>{const f=buildFrame();return f?toCSV(f):"";};
+window.addEventListener("message",e=>{if(e.data&&e.data.type==="fantasy:getData"&&e.source)e.source.postMessage({type:"fantasy:data",payload:window.fantasyData()},e.origin&&e.origin!=="null"?e.origin:"*");});
+function updateDataOut(){
+  const f=buildFrame();if(!f)return;
+  const el=$("fantasy-data");if(el)el.textContent=JSON.stringify(f);
+  const q=new URLSearchParams(location.search).get("data");
+  if(q){let box=$("rawdata");if(!box){box=document.createElement("pre");box.id="rawdata";document.body.appendChild(box);}box.textContent=q==="csv"?toCSV(f):JSON.stringify(f,null,1);}
+}
+$("expj").onclick=async()=>{const f=buildFrame();if(!f){$("expm").textContent="Data isn’t ready yet.";return;}try{await navigator.clipboard.writeText(JSON.stringify(f));$("expm").textContent="Copied the table as JSON.";}catch(e){$("expm").textContent="Couldn’t copy. Try Download CSV.";}};
+$("expc").onclick=()=>{const f=buildFrame();if(!f){$("expm").textContent="Data isn’t ready yet.";return;}const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([toCSV(f)],{type:"text/csv"}));a.download=`fantasy-week${S.view}.csv`;document.body.appendChild(a);a.click();a.remove();$("expm").textContent="Downloaded.";};
 function maybeTutorial(){
   if(S.tutChecked)return;
   if(lsGet("tutSeen",false)){S.tutChecked=true;return;}
@@ -630,7 +676,7 @@ async function loadLeague(){
   const own={};us.j.forEach(u=>own[u.user_id]=u.display_name);
   S.name={};ro.j.forEach(r=>S.name[r.roster_id]=own[r.owner_id]||"Team "+r.roster_id);
   S.rec={};ro.j.forEach(r=>{const t=r.settings||{};S.rec[r.roster_id]=`${t.wins||0}-${t.losses||0}${t.ties?"-"+t.ties:""}`;});
-  $("title").textContent=lg.j.name;$("navsub").textContent=lg.j.name;{const L=LEAGUES.find(l=>l.id===LID);if(L)L.name=lg.j.name;else LEAGUES.push({id:LID,name:lg.j.name});lsSet("leagues",LEAGUES);S.my=String(lsGet("my:"+LID,""));fillSettings();}$("wk").innerHTML=Array.from({length:18},(_,i)=>`<option value="${i+1}"${i+1===S.week?" selected":""}>Week ${i+1}${i+1===S.week?" (current)":""}</option>`).join("");$("mh").textContent="Week "+S.view+" matchups";
+  $("title").textContent=lg.j.name;$("navsub").textContent=lg.j.name;S.leagueName=lg.j.name;{const L=LEAGUES.find(l=>l.id===LID);if(L)L.name=lg.j.name;else LEAGUES.push({id:LID,name:lg.j.name});lsSet("leagues",LEAGUES);S.my=String(lsGet("my:"+LID,""));fillSettings();}$("wk").innerHTML=Array.from({length:18},(_,i)=>`<option value="${i+1}"${i+1===S.week?" selected":""}>Week ${i+1}${i+1===S.week?" (current)":""}</option>`).join("");$("mh").textContent="Week "+S.view+" matchups";
   return true;
 }
 async function loadPlayers(){
@@ -767,32 +813,6 @@ function gammaR(k,r){
   const d=k-1/3,c=1/Math.sqrt(9*d);
   for(;;){let x,v;do{x=normR(r);v=1+c*x;}while(v<=0);v=v*v*v;const u=r();if(u<1-.0331*x*x*x*x||Math.log(u||1e-12)<.5*x*x+d*(1-v+Math.log(v)))return d*v;}
 }
-function simDetail(A,B,ap,bp,seed,pa,pb){
-  const rng=mulberry(seed),N=4000,xa=new Float32Array(N),xb=new Float32Array(N);
-  const draw=(T,parts)=>{let x=0;for(const q of parts)x+=gammaR(q.mu*q.mu/q.v,rng)*(q.v/q.mu);return x+(T.extra>0?normR(rng)*Math.sqrt(T.extra):0);};
-  for(let i=0;i<N;i++){xa[i]=ap+draw(A,pa);xb[i]=bp+draw(B,pb);}
-  const q=(arr,p)=>Float32Array.from(arr).sort()[Math.min(N-1,Math.floor(p*N))],mean=arr=>arr.reduce((t,v)=>t+v,0)/N;
-  return{a:[q(xa,.1),mean(xa),q(xa,.9)],b:[q(xb,.1),mean(xb),q(xb,.9)]};
-}
-function drawMine(){
-  const el=$("mine");if(!el)return;
-  const h=S.heroData;
-  if(!S.my||!h){el.innerHTML="";return;}
-  const meA=String(h.a.roster_id)===S.my,Me=meA?h.A:h.B,Op=meA?h.B:h.A,me=meA?h.a:h.b,op=meA?h.b:h.a;
-  const winP=h.pa==null?null:(meA?h.pa:1-h.pa),ap=me.points||0,bp=op.points||0;
-  const done=Me.left<=0&&Op.left<=0;let rg=null;
-  if(!done){
-    const bk=lcBucket(h.A,h.B),vi=S.lc?S.lc.pick[bk]:0,pick=T=>vi===0?T.parts:T.partsV[vi-1];
-    rg=simDetail(Me,Op,ap,bp,(+me.roster_id)*977+(+op.roster_id)*31+Math.round(Me.left+Op.left),pick(Me),pick(Op));
-  }
-  const f1=x=>x.toFixed(1),side=(m,q,who)=>`<div class="hit2"><div class="tn">${esc(S.name[m.roster_id])}<span class="you" style="${who==="You"?"":"background:var(--gray);color:var(--on-gray)"}">${who}</span></div><div class="pts">${q?f1(q[1]):(m.points||0).toFixed(2)}</div><div class="sub2">${q?`80% range ${f1(q[0])} to ${f1(q[2])}`:"final score"}</div><div class="sub2">scored so far ${(m.points||0).toFixed(2)}</div></div>`;
-  const cl=winP==null?"var(--line)":winP>=.5?"var(--accent)":"var(--a2)",cl2=winP==null?"var(--line)":winP>=.5?"var(--a2)":"var(--accent)";
-  const inputs=["Sleeper projections","each player’s last 4 games","injury status","the live game clock","points scored so far"].concat(S.cal&&S.cal.kind==="C"?["ESPN betting lines"]:[]);
-  el.innerHTML=`<div class="m mine"><div class="minet">Your game: projected final score</div><div class="row">${side(me,rg&&rg.a,"You")}${side(op,rg&&rg.b,"Opp")}</div>
-    <div class="conf"><b style="color:${winP==null?"var(--mute)":winP>=.5?"var(--ok)":"var(--bad)"}">${winP==null?"…":Math.round(winP*100)+"%"}</b><span>chance you win</span></div>
-    <div class="track" style="margin:6px 0 10px"><i style="width:${winP==null?50:(winP*100).toFixed(1)}%;background:${cl}"></i><i style="flex:1;background:${cl2}"></i></div>
-    <div class="sub2" style="text-align:center">Built from ${inputs.slice(0,-1).join(", ")} and ${inputs[inputs.length-1]}. Ranges cover the middle 80% of simulated finishes.</div></div>`;
-}
 function simWin(A,B,ap,bp,seed){
   const rng=mulberry(seed),N=5000;let w=0;
   const draw=T=>{let x=0;for(const q of T.parts)x+=gammaR(q.mu*q.mu/q.v,rng)*(q.v/q.mu);return x+(T.extra>0?normR(rng)*Math.sqrt(T.extra):0);};
@@ -897,7 +917,7 @@ function snapProj(){
 async function tick(){
   const [mu]=await Promise.all([get("Sleeper matchups",`${SL}/league/${LID}/matchups/${S.view}`),loadGames()]);
   if(mu.ok){S.mu=mu.j;setDiag("Sleeper matchups",true,mu.j.length+" teams");}
-  snapProj();render();if(S.wn&&$("wn").open)drawWindows();maybeTutorial();if(S.lcDirty&&LC){lcSave(LC);S.lcDirty=false;}$("stamp").textContent="Updated "+new Date().toLocaleTimeString();
+  snapProj();render();if(S.wn&&$("wn").open)drawWindows();maybeTutorial();if(S.lcDirty&&LC){lcSave(LC);S.lcDirty=false;}updateDataOut();$("stamp").textContent="Updated "+new Date().toLocaleTimeString();
 }
 
 // ---- rank curves ----
@@ -1071,8 +1091,8 @@ function render(){
   if(S.tut){S.dirty=true;return;} // don't rebuild the cards while the tutorial points at them
   if(S.curves&&JSON.stringify(myPlayers())!==S.sig)renderCurves();
   const by={};S.mu.forEach(m=>(by[m.matchup_id]??=[]).push(m));
-  S.heroData=null;
-  $("matchups").innerHTML=Object.values(by).map(([a,b])=>{
+  S.wp={};
+  $("matchups").innerHTML=Object.values(by).sort((x,y)=>(+y.some(m=>String(m.roster_id)===S.my))-(+x.some(m=>String(m.roster_id)===S.my))).map(([a,b])=>{
     if(!b)return"";
     const A=teamStats(a),B=teamStats(b),ready=S.curves&&S.games&&Object.keys(S.exp).length;
     let pa=null,ps=null;
@@ -1088,9 +1108,9 @@ function render(){
         pa=clamp(calibLive(raws[vi],bk,vi),.01,.99);
         recordLive(a,b,A,B,raws,clamp(cdf(((ap+A.slx)-(bp+B.slx))/Math.sqrt(A.slv+B.slv+1e-9)),.01,.99));
       } // minutes left = at least 1%
-      if(S.sl)ps=(pa===0||pa===1||(aDone&&bDone))?pa:clamp(cdf(((ap+A.slx)-(bp+B.slx))/Math.sqrt(A.slv+B.slv+1e-9)),.01,.99);
+      ps=(pa===0||pa===1||(aDone&&bDone))?pa:clamp(cdf(((ap+A.slx)-(bp+B.slx))/Math.sqrt(A.slv+B.slv+1e-9)),.01,.99);
     }
-    if(ready&&S.my&&(String(a.roster_id)===S.my||String(b.roster_id)===S.my))S.heroData={a,b,A,B,pa};
+    S.wp[a.roster_id]={p:pa,s:ps};S.wp[b.roster_id]={p:pa==null?null:1-pa,s:ps==null?null:1-ps};
     const pc=x=>x==null?"…":Math.round(x*100)+"%";
     const cl=pa==null?["var(--line)","var(--line)"]:pa>=.5?["var(--accent)","var(--a2)"]:["var(--a2)","var(--accent)"]; // lower side is always red
     const side=(m,T,cls,won)=>{
@@ -1102,7 +1122,6 @@ function render(){
       <div class="wp"><b class="${pa!=null&&pa<.5?"lo":""}">${pc(pa)}</b><div class="track" role="img" aria-label="Win probability"><i style="width:${pa==null?50:(pa*100).toFixed(1)}%;background:${cl[0]}"></i><i style="flex:1;background:${cl[1]}"></i></div><b class="${pa!=null&&pa>.5?"lo":""}">${pc(pa==null?null:1-pa)}</b></div>${S.sl&&ps!=null?(()=>{const sc=ps>=.5?["var(--accent)","var(--a2)"]:["var(--a2)","var(--accent)"];return `<div class="wp sl" title="Win odds from Sleeper projections only"><b class="${ps<.5?"lo":""}">${pc(ps)}</b><div class="track" role="img" aria-label="Sleeper win probability"><i style="width:${(ps*100).toFixed(1)}%;background:${sc[0]}"></i><i style="flex:1;background:${sc[1]}"></i></div><b class="${ps>.5?"lo":""}">${pc(1-ps)}</b></div><div class="slcap">Sleeper projections only</div>`;})():""}
       <div class="tl"><div${A.cells.some(c=>c.st!=="out"&&c.f>0)?` data-m="${a.roster_id}" role="button" tabindex="0"`:""}>${meter(A)}</div><div class="r"${B.cells.some(c=>c.st!=="out"&&c.f>0)?` data-m="${b.roster_id}" role="button" tabindex="0"`:""}>${meter(B)}</div></div></div>`;
   }).join("")||'<p class="mute">No matchups yet.</p>';
-  drawMine();
 }
 
 // ---- start ----
@@ -1112,8 +1131,9 @@ function render(){
   loadProj().then(()=>{snapProj();render();});
   tick();
   timer=setInterval(tick,30000);
-  build(true).catch(()=>{}).then(()=>backtest()).catch(()=>{}).then(()=>resolveLive()).catch(()=>{}).then(()=>{S.ready=true;mkExp();updateStack();render();maybeTutorial();});
+  build(true).catch(()=>{}).then(()=>backtest()).catch(()=>{}).then(()=>resolveLive()).catch(()=>{}).then(()=>{S.ready=true;mkExp();updateStack();render();maybeTutorial();updateDataOut();window.dataReadyResolve&&window.dataReadyResolve();});
 })();
 </script>
+<script type="application/json" id="fantasy-data">{}</script>
 </body>
 </html>
