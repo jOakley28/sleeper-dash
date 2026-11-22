@@ -34,7 +34,7 @@ select{padding:calc(8px*var(--s)) calc(14px*var(--s));border:0;border-radius:cal
 .tog input:checked{background:var(--accent)}.tog input:checked:after{transform:translateX(calc(16px*var(--s)))}
 .m{background:var(--surface);border-radius:calc(24px*var(--s));padding:calc(14px*var(--s));box-shadow:var(--shadow);margin-bottom:calc(14px*var(--s))}
 .row{display:flex;gap:calc(10px*var(--s))}.r{text-align:right}
-.hit{cursor:pointer;flex:1;min-width:0;background:var(--fill);border-radius:calc(18px*var(--s));padding:calc(12px*var(--s)) calc(14px*var(--s));transition:transform .2s,background .2s}.hit:active{transform:scale(.98)}
+.hit{position:relative;cursor:pointer;flex:1;min-width:0;background:var(--fill);border-radius:calc(18px*var(--s));padding:calc(12px*var(--s)) calc(14px*var(--s));transition:transform .2s,background .2s}.hit:active{transform:scale(.98)}
 .tn{overflow-wrap:break-word;font-size:calc(15px*var(--s));font-weight:600;line-height:1.25}.rec{font-size:calc(13px*var(--s));font-style:italic;font-weight:400;color:var(--mute)}
 .pts{font-size:calc(36px*var(--s));font-weight:700;letter-spacing:-.035em;line-height:1.1;font-variant-numeric:tabular-nums;margin:calc(2px*var(--s)) 0}
 .lnk,.lnk0{font-style:italic;font-size:calc(14px*var(--s));white-space:nowrap}
@@ -95,7 +95,7 @@ dialog.short{max-height:72vh;overflow-y:auto}
 @keyframes pulse{from{transform:scale(1);opacity:.6}to{transform:scale(3);opacity:0}}
 .m{position:relative}
 .livedot,.ldot{width:calc(9px*var(--s));height:calc(9px*var(--s));border-radius:50%;background:var(--a2);position:relative}
-.livedot{position:absolute;top:calc(8px*var(--s));right:calc(10px*var(--s));z-index:2}.ldot{display:inline-block}
+.livedot{position:absolute;top:calc(8px*var(--s));right:calc(10px*var(--s));z-index:2}.ldot{display:inline-block}.hit.live .tn{padding-right:calc(18px*var(--s))}
 .livedot:after,.ldot:after{content:"";position:absolute;inset:0;border-radius:50%;background:var(--a2);animation:pulse 1.6s ease-out infinite}
 .nt{display:flex;flex-direction:column;min-width:0;line-height:1.2}
 .nav small{max-height:0;opacity:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:calc(12px*var(--s));transition:max-height .3s,opacity .3s}
@@ -1115,11 +1115,11 @@ function render(){
     const cl=pa==null?["var(--line)","var(--line)"]:pa>=.5?["var(--accent)","var(--a2)"]:["var(--a2)","var(--accent)"]; // lower side is always red
     const side=(m,T,cls,won)=>{
       S.det[m.roster_id]={T,m,name:S.name[m.roster_id]};
-      const pv=T.left<=0?(m.points||0).toFixed(2):T.proj.toFixed(1),zero=(m.points||0)===0;
-      return `<div class="${cls} hit${won?" win":""}" data-t="${m.roster_id}" role="button" tabindex="0"><div class="tn">${cls==="r"?`<span class="rec">(${S.rec[m.roster_id]||"0-0"})</span> `:""}${esc(S.name[m.roster_id])}${String(m.roster_id)===S.my?`<span class="you">You</span>`:""}${cls==="r"?"":` <span class="rec">(${S.rec[m.roster_id]||"0-0"})</span>`}</div><div class="pts">${(m.points||0).toFixed(2)}</div>${S.curves?`${T.started?`<span class="lnk0">${pv} projected</span>`:`<button class="lnk" data-r="${m.roster_id}">Projected score ${pv}</button>`}`:""}</div>`;
+      const on=T.cells.some(c=>c.gs==="in"&&c.st!=="out"&&c.st!=="bye"),pv=T.left<=0?(m.points||0).toFixed(2):T.proj.toFixed(1),zero=(m.points||0)===0;
+      return `<div class="${cls} hit${won?" win":""}${on?" live":""}" data-t="${m.roster_id}" role="button" tabindex="0">${on?`<span class="livedot" title="A player is playing now"></span>`:""}<div class="tn">${cls==="r"?`<span class="rec">(${S.rec[m.roster_id]||"0-0"})</span> `:""}${esc(S.name[m.roster_id])}${String(m.roster_id)===S.my?`<span class="you">You</span>`:""}${cls==="r"?"":` <span class="rec">(${S.rec[m.roster_id]||"0-0"})</span>`}</div><div class="pts">${(m.points||0).toFixed(2)}</div>${S.curves?`${T.started?`<span class="lnk0">${pv} projected</span>`:`<button class="lnk" data-r="${m.roster_id}">Projected score ${pv}</button>`}`:""}</div>`;
     };
-    return `<div class="m" data-pair="${a.roster_id},${b.roster_id}">${(A.cells.some(c=>c.gs==="in")||B.cells.some(c=>c.gs==="in"))?`<span class="livedot" title="Game in progress"></span>`:""}<div class="row">${side(a,A,"",pa===1)}${side(b,B,"r",pa===0)}</div>
-      <div class="wp"><b class="${pa!=null&&pa<.5?"lo":""}">${pc(pa)}</b><div class="track" role="img" aria-label="Win probability"><i style="width:${pa==null?50:(pa*100).toFixed(1)}%;background:${cl[0]}"></i><i style="flex:1;background:${cl[1]}"></i></div><b class="${pa!=null&&pa>.5?"lo":""}">${pc(pa==null?null:1-pa)}</b></div>${S.sl&&ps!=null?(()=>{const sc=ps>=.5?["var(--accent)","var(--a2)"]:["var(--a2)","var(--accent)"];return `<div class="wp sl" title="Win odds from Sleeper projections only"><b class="${ps<.5?"lo":""}">${pc(ps)}</b><div class="track" role="img" aria-label="Sleeper win probability"><i style="width:${(ps*100).toFixed(1)}%;background:${sc[0]}"></i><i style="flex:1;background:${sc[1]}"></i></div><b class="${ps>.5?"lo":""}">${pc(1-ps)}</b></div><div class="slcap">Sleeper projections only</div>`;})():""}
+    return `<div class="m" data-pair="${a.roster_id},${b.roster_id}"><div class="row">${side(a,A,"",pa===1)}${side(b,B,"r",pa===0)}</div>
+      <div class="wp"><b class="${pa!=null&&pa<.5?"lo":""}">${pc(pa)}</b><div class="track" role="img" aria-label="Win probability"><i style="width:${pa==null?50:(pa*100).toFixed(1)}%;background:${cl[0]}"></i><i style="flex:1;background:${cl[1]}"></i></div><b class="${pa!=null&&pa>.5?"lo":""}">${pc(pa==null?null:1-pa)}</b></div>${S.sl&&ps!=null?(()=>{const sc=ps>=.5?["var(--accent)","var(--a2)"]:["var(--a2)","var(--accent)"];return `<div class="wp sl" title="Win odds from Sleeper projection"><b class="${ps<.5?"lo":""}">${pc(ps)}</b><div class="track" role="img" aria-label="Sleeper win probability"><i style="width:${(ps*100).toFixed(1)}%;background:${sc[0]}"></i><i style="flex:1;background:${sc[1]}"></i></div><b class="${ps>.5?"lo":""}">${pc(1-ps)}</b></div><div class="slcap">Sleeper projection</div>`;})():""}
       <div class="tl"><div${A.cells.some(c=>c.st!=="out"&&c.f>0)?` data-m="${a.roster_id}" role="button" tabindex="0"`:""}>${meter(A)}</div><div class="r"${B.cells.some(c=>c.st!=="out"&&c.f>0)?` data-m="${b.roster_id}" role="button" tabindex="0"`:""}>${meter(B)}</div></div></div>`;
   }).join("")||'<p class="mute">No matchups yet.</p>';
 }
