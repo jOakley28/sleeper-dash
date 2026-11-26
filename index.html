@@ -129,7 +129,6 @@ details.nerds[hidden]{display:none}
 .wp.sl{margin-top:calc(8px*var(--s))}.wp.sl b{font-style:italic;font-weight:600;font-size:calc(13px*var(--s));min-width:calc(40px*var(--s))}.wp.sl .track{height:calc(4px*var(--s))}
 .slcap{text-align:center;font-size:calc(11px*var(--s));font-style:italic;color:var(--mute);margin-top:calc(2px*var(--s))}
 #rawdata{position:fixed;inset:0;z-index:200;margin:0;padding:12px;overflow:auto;background:#fff;color:#000;white-space:pre-wrap;font:12px/1.35 ui-monospace,Menlo,monospace;-webkit-user-select:text;user-select:text}
-#slm{width:100%;box-shadow:none;background:var(--fill)}
 #lsel,#myt{width:100%;box-shadow:none;background:var(--fill)}.addrow{display:flex;gap:calc(8px*var(--s));margin-top:calc(8px*var(--s))}.addrow input{flex:1;min-width:0;padding:calc(9px*var(--s)) calc(14px*var(--s));border:0;border-radius:calc(980px*var(--s));background:var(--fill);color:var(--ink);font:inherit;font-size:calc(15px*var(--s))}
 .you{font-size:calc(10px*var(--s));font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:var(--blue);color:#fff;border-radius:calc(980px*var(--s));padding:calc(1px*var(--s)) calc(7px*var(--s));margin-left:calc(5px*var(--s));vertical-align:calc(1px*var(--s));font-style:normal}
 .hit.win{background:color-mix(in srgb,var(--accent) 14%,var(--surface))}
@@ -265,13 +264,6 @@ details.nerds[hidden]{display:none}
   <select id="myt" aria-label="My team"></select>
   <h4>Sleeper stats</h4>
   <label class="tog" style="justify-content:space-between"><span>Show Sleeper projections, Sleeper win odds, and Stats for nerds</span><input type="checkbox" id="slt"></label>
-  <h4>Match the Sleeper app</h4>
-  <small>Open a matchup in Sleeper and enter what it shows right now. The page records its own numbers at the same moment and tunes the Sleeper bar to match. A few readings from different points in games works best.</small>
-  <select id="slm" aria-label="Matchup" style="margin-top:calc(8px*var(--s))"></select>
-  <div class="addrow"><input id="slp" inputmode="decimal" placeholder="Sleeper win % for the left team"></div>
-  <div class="addrow"><input id="sla" inputmode="decimal" placeholder="Sleeper projected total, left (optional)"><input id="slb" inputmode="decimal" placeholder="right (optional)"></div>
-  <div class="addrow"><button id="sladd">Add reading</button><button class="ghost" id="slclr">Clear readings</button></div>
-  <small id="slfit"></small>
   <h4>Data export</h4>
   <div class="addrow"><button class="ghost" id="expj" style="padding-left:0">Copy JSON</button><button class="ghost" id="expc">Download CSV</button></div>
   <small id="expm">One table: a row per player, with team, game, and projection columns. Developers: call window.fantasyData() in the page, or open it with ?data=json.</small>
@@ -376,57 +368,12 @@ function updateDataOut(){
 }
 $("expj").onclick=async()=>{const f=buildFrame();if(!f){$("expm").textContent="Data isn’t ready yet.";return;}try{await navigator.clipboard.writeText(JSON.stringify(f));$("expm").textContent="Copied the table as JSON.";}catch(e){$("expm").textContent="Couldn’t copy. Try Download CSV.";}};
 $("expc").onclick=()=>{const f=buildFrame();if(!f){$("expm").textContent="Data isn’t ready yet.";return;}const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([toCSV(f)],{type:"text/csv"}));a.download=`fantasy-week${S.view}.csv`;document.body.appendChild(a);a.click();a.remove();$("expm").textContent="Downloaded.";};
-// ---- Match the Sleeper app: fit the Sleeper bar to readings you type in from the app ----
-S.slRead=lsGet("slread:"+LID,[]);if(!Array.isArray(S.slRead))S.slRead=[];S.slFit={r:1,k:1,n:0,err:null};
-function invNorm(p){
-  const a=[-39.69683028665376,220.9460984245205,-275.9285104469687,138.357751867269,-30.66479806614716,2.506628277459239],
-  b=[-54.47609879822406,161.5858368580409,-155.6989798598866,66.80131188771972,-13.28068155288572],
-  c=[-0.007784894002430293,-0.3223964580411365,-2.400758277161838,-2.549732539343734,4.374664141464968,2.938163982698783],
-  d=[0.007784695709041462,0.3224671290700398,2.445134137142996,3.754408661907416],pl=.02425;let q,r;
-  if(p<pl){q=Math.sqrt(-2*Math.log(p));return(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);}
-  if(p>1-pl){q=Math.sqrt(-2*Math.log(1-p));return-(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);}
-  q=p-.5;r=q*q;return(((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q/(((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
-}
+// Sleeper-style forecast: points so far plus Sleeper's pre-game projection for the time left, with a simple spread.
+// (Sleeper doesn't publish the win percentage its app shows, so this is an estimate, not the app's number.)
 function slProb(ap,bp,A,B){
-  const F=S.slFit||{r:1,k:1};
-  return clamp(cdf(((ap+F.r*A.slx)-(bp+F.r*B.slx))/(F.k*Math.sqrt(A.slv+B.slv+1e-9))),.01,.99);
+  return clamp(cdf(((ap+A.slx)-(bp+B.slx))/Math.sqrt(A.slv+B.slv+1e-9)),.01,.99);
 }
-function fitSleeper(){
-  const R=S.slRead||[];let r=1;
-  // how the app's projected points still to come compare with Sleeper's pre-game projection scaled by time left
-  const xs=[];R.forEach(x=>{if(x.aProj!=null&&x.bProj!=null){xs.push([x.aSlx,x.aProj-x.aPts]);xs.push([x.bSlx,x.bProj-x.bPts]);}});
-  if(xs.length>=2){let sxy=0,sxx=0;xs.forEach(([a,b])=>{sxy+=a*b;sxx+=a*a;});if(sxx>1)r=clamp(sxy/sxx,.3,3);}
-  // the spread the app seems to use: the gap between teams divided by the z-score of the app's win chance
-  const ks=[];
-  R.forEach(x=>{const gap=(x.aPts+r*x.aSlx)-(x.bPts+r*x.bSlx),z=invNorm(clamp(x.p,.02,.98));if(Math.abs(z)<.08||Math.abs(gap)<.3||gap*z<=0)return;ks.push(gap/(z*Math.sqrt(x.v+1e-9)));});
-  let k=1;if(ks.length){ks.sort((a,b)=>a-b);k=clamp(ks[Math.floor(ks.length/2)],.2,6);}
-  let err=null;
-  if(R.length)err=R.reduce((q,x)=>{const gap=(x.aPts+r*x.aSlx)-(x.bPts+r*x.bSlx);return q+Math.abs(clamp(cdf(gap/(k*Math.sqrt(x.v+1e-9))),.01,.99)-x.p);},0)/R.length*100;
-  S.slFit={r,k,n:R.length,err,used:ks.length};
-}
-function fillSl(){
-  const seen={},opts=[];
-  (S.mu||[]).forEach(m=>{(seen[m.matchup_id]??=[]).push(m);});
-  Object.values(seen).forEach(g=>{if(g.length<2)return;const [a,b]=g;const mine=String(a.roster_id)===S.my||String(b.roster_id)===S.my;
-    opts.push(`<option value="${a.roster_id},${b.roster_id}"${mine?" selected":""}>${esc(S.name[a.roster_id])} (left) vs ${esc(S.name[b.roster_id])}</option>`);});
-  $("slm").innerHTML=opts.join("")||'<option value="">No matchups loaded</option>';
-}
-function showSlFit(){
-  const f=S.slFit,el=$("slfit");if(!el)return;
-  if(!f||!f.n){el.textContent="No readings yet, so the Sleeper bar is using a default guess.";return;}
-  el.textContent=`${f.n} reading${f.n>1?"s":""} saved. Spread ×${f.k.toFixed(2)}`+(Math.abs(f.r-1)>.005?`, remaining points ×${f.r.toFixed(2)}`:"")+`. On your readings the Sleeper bar is off by about ${f.err.toFixed(1)} percentage points on average.`+(f.n<4?" Add a few more from different points in games for a closer match.":"");
-}
-$("sladd").onclick=()=>{
-  const m=$("slm").value,msg=t=>{$("slfit").textContent=t;};
-  if(!m){msg("No matchup is loaded yet.");return;}
-  const [a,b]=m.split(","),da=S.det[a],db=S.det[b];if(!da||!db){msg("Wait for the scores to load, then try again.");return;}
-  let p=parseFloat($("slp").value);if(!(p>0)){msg("Enter the Sleeper win % for the left team, like 63.");return;}
-  if(p<=1)p*=100;if(p>=100){msg("Enter a percentage between 1 and 99.");return;}
-  const ap=parseFloat($("sla").value),bq=parseFloat($("slb").value);
-  S.slRead.push({t:Date.now(),w:S.view,p:p/100,aPts:da.m.points||0,bPts:db.m.points||0,aSlx:da.T.slx,bSlx:db.T.slx,v:da.T.slv+db.T.slv,aProj:isNaN(ap)?null:ap,bProj:isNaN(bq)?null:bq});
-  lsSet("slread:"+LID,S.slRead);fitSleeper();$("slp").value="";$("sla").value="";$("slb").value="";showSlFit();render();
-};
-$("slclr").onclick=()=>{S.slRead=[];lsSet("slread:"+LID,S.slRead);fitSleeper();showSlFit();render();};
+try{localStorage.removeItem("slread:"+LID);}catch(e){}
 function maybeTutorial(){
   if(S.tutChecked)return;
   if(lsGet("tutSeen",false)){S.tutChecked=true;return;}
@@ -656,7 +603,7 @@ document.querySelectorAll("dialog").forEach(dl=>dl.addEventListener("click",e=>{
   if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dl.close();
 }));
 $("eye").onclick=()=>$("ex").showModal();$("exx").onclick=()=>$("ex").close();
-$("tb").onclick=()=>{fillSl();showSlFit();$("dg").showModal();};$("dx").onclick=()=>$("dg").close();
+$("tb").onclick=()=>$("dg").showModal();$("dx").onclick=()=>$("dg").close();
 
 // ---- time ----
 function minsLeft(ev){
@@ -1185,7 +1132,6 @@ function render(){
 
 // ---- start ----
 (async()=>{
-  fitSleeper();
   if(!await loadLeague())return;
   await loadPlayers();
   loadProj().then(()=>{snapProj();render();});
