@@ -101,7 +101,10 @@ dialog.short{max-height:72vh;overflow-y:auto}
 .nav small{max-height:0;opacity:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:calc(12px*var(--s));transition:max-height .3s,opacity .3s}
 .nav.scrolled small{max-height:calc(20px*var(--s));opacity:1}
 .wh{display:flex;justify-content:space-between;gap:calc(12px*var(--s));margin:calc(12px*var(--s)) 0 calc(4px*var(--s));font-size:calc(13px*var(--s));font-weight:600}.wh span:last-child{text-align:right}
-.win{padding:calc(10px*var(--s)) 0;border-bottom:1px solid var(--line)}.win.past{opacity:.5}.win.empty{opacity:.38;padding:calc(7px*var(--s)) 0}.win.empty .wlab{margin:0}
+.win{padding:calc(10px*var(--s)) 0;border-bottom:1px solid var(--line)}.win.past{opacity:.5}.win .nowline{margin:calc(6px*var(--s)) 0 calc(9px*var(--s))}
+#wn{max-height:calc(100dvh - 20px)}
+.wnav{display:flex;align-items:center;justify-content:center;gap:calc(14px*var(--s));margin:calc(2px*var(--s)) 0 calc(4px*var(--s))}.wnav button{font-size:calc(24px*var(--s));line-height:1;padding:0 calc(14px*var(--s))}.wnav button:disabled{opacity:.25}
+#wnb.mv-l{animation:inL .38s cubic-bezier(.16,1,.3,1)}#wnb.mv-r{animation:inR .38s cubic-bezier(.16,1,.3,1)}.win.empty{opacity:.38;padding:calc(7px*var(--s)) 0}.win.empty .wlab{margin:0}
 .wlab{display:flex;align-items:center;gap:calc(7px*var(--s));font-size:calc(13px*var(--s));font-weight:600;color:var(--mute);margin-bottom:calc(7px*var(--s))}
 .wr{display:flex;justify-content:space-between;gap:calc(12px*var(--s))}.wc{flex:1;min-width:0}.wc.r{text-align:right}.dash{color:var(--mute)}
 .seg.big{flex-wrap:wrap;gap:calc(4px*var(--s));margin-top:0}.seg.big i[data-w]{cursor:pointer}.seg.big i[data-w]:active{transform:scale(.92)}
@@ -228,6 +231,7 @@ details.nerds[hidden]{display:none}
 <dialog id="wn" class="short">
   <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><strong>Game windows</strong><button class="ghost" id="wnx">Close</button></div>
   <div class="wh"><span id="wna"></span><span id="wnc"></span></div>
+  <div class="wnav"><button class="ghost" id="wnp" aria-label="Previous matchup">‹</button><small id="wnpos"></small><button class="ghost" id="wnn" aria-label="Next matchup">›</button></div>
   <div id="wnb"></div>
 </dialog>
 <dialog id="pl" class="short">
@@ -529,6 +533,7 @@ function drawWindows(){
   const {a,b}=S.wn,D=[S.det[a],S.det[b]];if(!D[0]||!D[1])return;
   $("wna").innerHTML=esc(D[0].name)+`<span class="wsc">${(D[0].m.points||0).toFixed(2)}</span>`;
   $("wnc").innerHTML=`<span class="wsc">${(D[1].m.points||0).toFixed(2)}</span>`+esc(D[1].name);
+  {const L=matchupPairs(),ix=L.findIndex(p=>p[0]===String(a)&&p[1]===String(b));$("wnpos").textContent=L.length>1?`Matchup ${ix+1} of ${L.length}`:"";$("wnp").disabled=ix<=0;$("wnn").disabled=ix<0||ix>=L.length-1;$("wnp").hidden=$("wnn").hidden=L.length<2;}
   const W={},of={},info={},buckets={};
   if(!Object.values(S.gi||{}).some(g=>g.date)){$("wnb").innerHTML='<p class="mute">Game times aren’t available yet.</p>';return;}
   for(const [team,g] of Object.entries(S.gi||{})){
@@ -552,14 +557,30 @@ function drawWindows(){
   let h="",placed=false;
   for(const w of list){
     const past=w.states.every(x=>x==="post"),live=w.states.some(x=>x==="in");
-    if(!past&&!placed){h+=line;placed=true;}
+    const here=!past&&!placed;if(here)placed=true; // the now line sits inside the first window that hasn't finished
     const col=cs=>cs.length?`<div class="seg big">${cs.map(c=>segCell(c,true,S.wreg.push(c)-1)).join("")}</div>`:'<span class="dash">–</span>';
-    h+=`<div class="win${past?" past":""}"><div class="wlab">${live?'<span class="ldot"></span>':""}${esc(w.label)}</div><div class="wr"><div class="wc">${col(w.cells[0])}</div><div class="wc r">${col(w.cells[1])}</div></div></div>`;
+    h+=`<div class="win${past?" past":""}"><div class="wlab">${live?'<span class="ldot"></span>':""}${esc(w.label)}</div>${here?line:""}<div class="wr"><div class="wc">${col(w.cells[0])}</div><div class="wc r">${col(w.cells[1])}</div></div></div>`;
   }
   if(!placed)h+=line;
   $("wnb").innerHTML=h;
 }
 $("wnx").onclick=()=>$("wn").close();
+function matchupPairs(){
+  const by={};(S.mu||[]).forEach(m=>(by[m.matchup_id]??=[]).push(m));
+  return Object.values(by).filter(g=>g.length===2).sort((x,y)=>(+y.some(m=>String(m.roster_id)===S.my))-(+x.some(m=>String(m.roster_id)===S.my))).map(g=>[String(g[0].roster_id),String(g[1].roster_id)]);
+}
+function wnGo(dir){
+  if(!S.wn)return;const L=matchupPairs(),ix=L.findIndex(p=>p[0]===String(S.wn.a)&&p[1]===String(S.wn.b)),n=ix+dir;
+  if(ix<0||n<0||n>=L.length)return;
+  S.wn={a:L[n][0],b:L[n][1]};drawWindows();
+  const el=$("wnb");el.classList.remove("mv-l","mv-r");void el.offsetWidth;el.classList.add(dir>0?"mv-l":"mv-r");
+}
+$("wnp").onclick=()=>wnGo(-1);$("wnn").onclick=()=>wnGo(1);
+$("wn").addEventListener("keydown",e=>{if(e.key==="ArrowLeft")wnGo(-1);else if(e.key==="ArrowRight")wnGo(1);});
+(()=>{let x0=0,y0=0,on=false;const dl=$("wn");
+  dl.addEventListener("touchstart",e=>{if(e.touches.length!==1)return;x0=e.touches[0].clientX;y0=e.touches[0].clientY;on=true;},{passive:true});
+  dl.addEventListener("touchend",e=>{if(!on)return;on=false;const t=e.changedTouches[0],dx=t.clientX-x0,dy=t.clientY-y0;if(Math.abs(dx)<50||Math.abs(dx)<Math.abs(dy)*1.5)return;wnGo(dx<0?1:-1);},{passive:true});
+})();
 $("plx").onclick=()=>$("pl").close();
 $("wnb").onclick=e=>{const i=e.target.closest("[data-w]");if(i)openPlayer(+i.dataset.w);};
 $("wnb").onkeydown=e=>{if(e.key==="Enter"){const i=e.target.closest("[data-w]");if(i)openPlayer(+i.dataset.w);}};
