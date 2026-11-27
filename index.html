@@ -512,13 +512,13 @@ $("rdsw").onclick=e=>{const b=e.target.closest("button");if(!b||!S.rd)return;if(
   dl.addEventListener("touchstart",e=>{if(e.touches.length!==1)return;x0=e.touches[0].clientX;y0=e.touches[0].clientY;on=true;},{passive:true});
   dl.addEventListener("touchend",e=>{if(!on||!S.rd)return;on=false;const t=e.changedTouches[0],dx=t.clientX-x0,dy=t.clientY-y0;if(Math.abs(dx)<50||Math.abs(dx)<Math.abs(dy)*1.5)return;const next=dx<0?"live":"pre";if(next!==S.rd.mode){S.rd.mode=next;drawRoster(false,dx<0?"l":"r");}},{passive:true});})();
 $("rmx").onclick=()=>$("rm").close();
-const WSLOTS=["Wednesday","Thursday","Friday","Saturday","Sunday · International","Sunday · Early","Sunday · Afternoon","Sunday · Late","Monday","Tuesday"];
-function winKey(iso,intl){
+const WDAYS=["Wednesday","Thursday","Friday","Saturday","Sunday","Monday","Tuesday"];
+function winInfo(iso,intl){
   const d=new Date(iso),p=new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",weekday:"long",hour:"numeric",hourCycle:"h23"}).formatToParts(d);
-  const wd=p.find(x=>x.type==="weekday").value,hr=+p.find(x=>x.type==="hour").value;
-  // Sunday splits by kickoff time (Eastern); games played overseas, or kicking off before noon, are the international window
-  const label=wd==="Sunday"?"Sunday · "+((intl||hr<12)?"International":hr<15?"Early":hr<19?"Afternoon":"Late"):wd;
-  return{key:label,label,order:Math.max(0,WSLOTS.indexOf(label))};
+  const day=p.find(x=>x.type==="weekday").value,hr=+p.find(x=>x.type==="hour").value;
+  // time slots by Eastern kickoff time; on Sunday, games played overseas or kicking off before noon are the international window
+  const b=(day==="Sunday"&&(intl||hr<12))?"International":hr<15?"Early":hr<19?"Afternoon":"Late";
+  return{day,di:Math.max(0,WDAYS.indexOf(day)),b,bo:{International:0,Early:1,Afternoon:2,Late:3}[b]};
 }
 function openWindows(a,b){
   if(!S.det[a]||!S.det[b])return;S.wn={a,b};
@@ -529,12 +529,16 @@ function drawWindows(){
   const {a,b}=S.wn,D=[S.det[a],S.det[b]];if(!D[0]||!D[1])return;
   $("wna").innerHTML=esc(D[0].name)+`<span class="wsc">${(D[0].m.points||0).toFixed(2)}</span>`;
   $("wnc").innerHTML=`<span class="wsc">${(D[1].m.points||0).toFixed(2)}</span>`+esc(D[1].name);
-  const W={},of={};
-  WSLOTS.forEach((l,i)=>W[l]={label:l,order:i,cells:[[],[]],states:[]});
+  const W={},of={},info={},buckets={};
   if(!Object.values(S.gi||{}).some(g=>g.date)){$("wnb").innerHTML='<p class="mute">Game times aren’t available yet.</p>';return;}
   for(const [team,g] of Object.entries(S.gi||{})){
-    if(!g.date)continue;const k=winKey(g.date,g.intl);of[team]=k.key;
-    (W[k.key]??={label:k.label,order:k.order,cells:[[],[]],states:[]}).states.push(g.state);
+    if(!g.date)continue;const k=winInfo(g.date,g.intl);info[team]=k;(buckets[k.day]??=new Set()).add(k.b);
+  }
+  // only days that have games are shown. Sunday always splits by time slot; other days split only when they have games in more than one slot.
+  for(const [team,k] of Object.entries(info)){
+    const label=k.day==="Sunday"?"Sunday · "+k.b:(buckets[k.day].size>1?`${k.day} · ${k.b}`:k.day);
+    of[team]=label;
+    (W[label]??={label,order:k.di*10+k.bo,cells:[[],[]],states:[]}).states.push(S.gi[team].state);
   }
   const list=Object.values(W).sort((x,y)=>x.order-y.order);
   D.forEach((d,i)=>{
@@ -547,7 +551,6 @@ function drawWindows(){
   const line='<div class="nowline" role="separator" aria-label="Now"><b>Now</b></div>';
   let h="",placed=false;
   for(const w of list){
-    if(!w.states.length){h+=`<div class="win empty"><div class="wlab">${esc(w.label)}<span class="dash" style="margin-left:auto">No games</span></div></div>`;continue;}
     const past=w.states.every(x=>x==="post"),live=w.states.some(x=>x==="in");
     if(!past&&!placed){h+=line;placed=true;}
     const col=cs=>cs.length?`<div class="seg big">${cs.map(c=>segCell(c,true,S.wreg.push(c)-1)).join("")}</div>`:'<span class="dash">–</span>';
